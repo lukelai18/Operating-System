@@ -185,8 +185,29 @@ proc_t *proc_lookup(pid_t pid)
  */
 proc_t *proc_create(const char *name)
 {
-    NOT_YET_IMPLEMENTED("PROCS: proc_create");
-    return NULL;
+    proc_t *new_proc;
+    new_proc->p_pid=_proc_getid(); // Get a new id
+    *new_proc->p_name=name; //Initialize the name TODO: Check it
+    new_proc=slab_obj_alloc(proc_allocator); // Allocated new space for new_proc
+    new_proc->p_pml4=pt_create(); // New page table
+    list_init(&new_proc->p_threads); // Initialize two lists
+    list_init(&new_proc->p_children); 
+    new_proc->p_pproc=curproc; // How to set the parent process
+    
+    list_link_init(&new_proc->p_child_link); // Initialize two list link
+    list_link_init(&new_proc->p_list_link);
+    list_insert_tail(&proc_list,&new_proc->p_child_link); //  Insert the new_proc into the proc_list
+
+    spinlock_init(&new_proc->p_children_lock); // Initialize spin lock
+    new_proc->p_status=0; 
+    new_proc->p_state=PROC_RUNNING;
+    memset(&new_proc->p_wait,0,sizeof(ktqueue_t));
+
+    if(new_proc->p_pid==PID_INIT){ // If the new proc is the init process
+        new_proc=proc_initproc;
+    }
+    // NOT_YET_IMPLEMENTED("PROCS: proc_create");
+    return new_proc;
 }
 
 /*
@@ -208,7 +229,20 @@ proc_t *proc_create(const char *name)
  */
 void proc_cleanup(long status)
 {
-    NOT_YET_IMPLEMENTED("PROCS: proc_cleanup");
+    curproc->p_state=PROC_DEAD;
+    curproc->p_status=status;         // Set current process's state and status
+    if(curproc->p_pid==PID_INIT){ // If the current process is initial process
+       initproc_finish(); // Shup down the weenix
+    }
+    else{
+        list_iterate(&curproc->p_children,p_child,proc_t,p_child_link){ // Loop the child list
+               // TODO: Check it later
+               list_insert_tail(&proc_initproc->p_children,&curproc->p_child_link); // Add the children into 
+                                                                                   // initial process's list                                                                                  
+               list_remove(&curproc->p_child_link); // Remove children in current process's children link
+        }
+    }
+    // NOT_YET_IMPLEMENTED("PROCS: proc_cleanup");
 }
 
 /*
@@ -226,7 +260,13 @@ void proc_cleanup(long status)
  */
 void proc_thread_exiting(void *retval)
 {
-    NOT_YET_IMPLEMENTED("PROCS: proc_thread_exiting");
+    proc_cleanup((long)retval); // Clean up the current process   
+    curthr->kt_state=KT_EXITED; // Set the exited state
+    curthr->kt_retval=retval; 
+    sched_broadcast_on(&curproc->p_pproc->p_wait); // Wake the parent of the process up
+    
+    sched_switch(curthr->kt_wchan,&curthr->kt_lock); // Force the process die
+    // NOT_YET_IMPLEMENTED("PROCS: proc_thread_exiting");
 }
 
 /*
@@ -237,7 +277,13 @@ void proc_thread_exiting(void *retval)
  */
 void proc_kill(proc_t *proc, long status)
 {
-    NOT_YET_IMPLEMENTED("PROCS: proc_kill");
+    if(proc!=curproc) { // Make sure that it is not current process
+    proc->p_status=status; // Set the status of the process
+      list_iterate(&proc->p_threads,p_thr,kthread_t,kt_plink){ // Iterate the process's thread list
+              kthread_cancel(p_thr,(void *)status); // Cancel all the thread
+      }            // TODO: Not sure if kthread_cancel is correct
+    }
+    // NOT_YET_IMPLEMENTED("PROCS: proc_kill");
 }
 
 /*
@@ -251,7 +297,14 @@ void proc_kill(proc_t *proc, long status)
  */
 void proc_kill_all()
 {
-    NOT_YET_IMPLEMENTED("PROCS: proc_kill_all");
+    list_iterate(&proc_list,iter_proc,proc_t,p_list_link){ // Loop the list of all processes
+           if(iter_proc->p_pproc!=&idleproc){ // If it's parents is not idleproc
+                 proc_kill(iter_proc,-1); // Cancel the process
+           }
+    }
+    // TODO: The same with above
+    do_exit(-1); // Kill the current process
+    //NOT_YET_IMPLEMENTED("PROCS: proc_kill_all");
 }
 
 /*
@@ -323,10 +376,42 @@ void proc_destroy(proc_t *proc)
  * If waiting on a specific child PID, wakeups from other exiting child
  * processes should be ignored.
  * If waiting on any child (-1), do_waitpid can return when *any* child has exited,
- * it does not have to return the one that exited earliest.
+ * it does not have to return the one that exited earliest. // TODO: Not sure what this mean
  */
 pid_t do_waitpid(pid_t pid, int *status, int options)
 {
+    if((pid<=0&&pid!=-1)||options!=0){
+        return -ENOTSUP; // TODO: Make sure the error code is correct
+    }
+    if(pid==-1&& list_empty(&curproc->p_children)){ // If the process has no children
+       return -ECHILD;
+    }
+    if(pid>0){
+       list_iterate(&curproc->p_children,iter_chil,proc_t,p_child_link){    
+           int find_pid=0;      
+           if(iter_chil->p_pid==pid){ // Clean up certain process with certain pid
+           iter_chil->p_status=-1;   // Set the status before destroy
+           status=(int *)&iter_chil->p_status; // Optionally return the status
+           sched_sleep_on(&curproc->p_wait,&curproc->p_children_lock); // Wait for the child
+           proc_destroy(iter_chil); // Destroy the child process
+           sched_wakeup_on(&curproc->p_wait,&curthr);
+           find_pid++;
+           }
+           if(find_pid==0){ // If we didn't find a specified pid in the children list
+               return -ECHILD;
+           }
+        }
+        // TODO: Figure out how to return error condition
+    }
+    else if(pid==-1){
+        list_iterate(&curproc->p_children,iter_chil,proc_t,p_child_link){
+           iter_chil->p_status=-1;   // Set the status before destroy
+           status=(int *)&iter_chil->p_status; // Optionally return the status
+           sched_sleep_on(&curproc->p_wait,&curproc->p_children_lock);
+           proc_destroy(iter_chil); // Destroy the child process
+           sched_wakeup_on(&curproc->p_wait,&curthr);
+        }
+    }   
     NOT_YET_IMPLEMENTED("PROCS: do_waitpid");
     return 0;
 }
@@ -336,7 +421,8 @@ pid_t do_waitpid(pid_t pid, int *status, int options)
  */
 void do_exit(long status)
 {
-    NOT_YET_IMPLEMENTED("PROCS: do_exit");
+    kthread_exit(&status); // TODO: Finish it later
+    // NOT_YET_IMPLEMENTED("PROCS: do_exit");
 }
 
 /*==========

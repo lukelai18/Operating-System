@@ -156,6 +156,7 @@ static void make_devices()
  */
 static void *initproc_run(long arg1, void *arg2)
 {
+    proctest_main(arg1,arg2); // For test
 #ifdef __VFS__
     dbg(DBG_INIT, "Initializing VFS...\n");
     vfs_init();
@@ -178,6 +179,10 @@ static void *initproc_run(long arg1, void *arg2)
  */
 void initproc_start()
 {
+    proc_t *new_proc = proc_create("init_proc"); // Create the initial process
+    kthread_t *new_kth=kthread_create(new_proc,initproc_run, 0, 0); // Create the initial process's only thread
+    sched_make_runnable(new_kth); // Make this thread runable
+    context_make_active(&curcore.kc_ctx); 
     NOT_YET_IMPLEMENTED("PROCS: initproc_start");
 }
 

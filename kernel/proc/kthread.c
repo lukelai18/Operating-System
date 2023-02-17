@@ -68,8 +68,26 @@ void kthread_init()
 kthread_t *kthread_create(proc_t *proc, kthread_func_t func, long arg1,
                           void *arg2)
 {
-    NOT_YET_IMPLEMENTED("PROCS: kthread_create");
-    return NULL;
+    kthread_t *new_kth;
+    new_kth = slab_obj_alloc(kthread_allocator); // Point to the chunk of memory
+    new_kth->kt_kstack=alloc_stack(); // Initialize the stack
+    new_kth->kt_retval=NULL;
+    new_kth->kt_errno=0;
+    new_kth->kt_proc=proc;
+    new_kth->kt_cancelled=0; 
+    new_kth->kt_wchan=NULL; // Initialize the queue of the thread
+    new_kth->kt_state=KT_NO_STATE;
+    spinlock_init(&new_kth->kt_lock); // Initialize the spinlock
+    list_link_init(&new_kth->kt_plink);
+    list_link_init(&new_kth->kt_qlink); //Initialize two list link
+    list_insert_tail(&proc->p_threads,&new_kth->kt_plink); // Add into proc's thread list
+    
+    list_init(&new_kth->kt_mutexes); 
+    new_kth->kt_recent_core=~0UL;
+    new_kth->kt_preemption_count=0;
+    context_setup(&new_kth->kt_ctx,func,arg1,arg2,new_kth->kt_kstack,DEFAULT_STACK_SIZE,curproc->p_pml4);  
+    // NOT_YET_IMPLEMENTED("PROCS: kthread_create");
+    return new_kth;
 }
 
 /*
@@ -101,16 +119,16 @@ kthread_t *kthread_clone(kthread_t *thr)
 void kthread_destroy(kthread_t *thr)
 {
     spinlock_lock(&thr->kt_lock);
-    KASSERT(thr != curthr);
+    KASSERT(thr != curthr);  // Ensure it is not current thread
     KASSERT(thr && thr->kt_kstack);
     if (thr->kt_state != KT_EXITED)
         panic("destroying thread in state %d\n", thr->kt_state);
-    free_stack(thr->kt_kstack);
+    free_stack(thr->kt_kstack); // Free the thread's stack
     if (list_link_is_linked(&thr->kt_plink))
-        list_remove(&thr->kt_plink);
+        list_remove(&thr->kt_plink); // Remove it from process's list of threads
 
     spinlock_unlock(&thr->kt_lock);
-    slab_obj_free(kthread_allocator, thr);
+    slab_obj_free(kthread_allocator, thr); // Free the struct it self
 }
 
 /*
@@ -126,7 +144,12 @@ void kthread_destroy(kthread_t *thr)
  */
 void kthread_cancel(kthread_t *thr, void *retval)
 {
-    NOT_YET_IMPLEMENTED("PROCS: kthread_cancel");
+    if(thr!=curthr){ // Make sure it is not current thread
+    thr->kt_retval=retval; // Set the return value
+    thr->kt_cancelled=1;
+    sched_cancel(thr);
+    }
+    // NOT_YET_IMPLEMENTED("PROCS: kthread_cancel");
 }
 
 /*
@@ -134,5 +157,6 @@ void kthread_cancel(kthread_t *thr, void *retval)
  */
 void kthread_exit(void *retval)
 {
-    NOT_YET_IMPLEMENTED("PROCS: kthread_exit");
+    proc_thread_exiting(retval);
+    // NOT_YET_IMPLEMENTED("PROCS: kthread_exit");
 }

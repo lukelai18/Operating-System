@@ -45,8 +45,7 @@ typedef struct kthread
     spinlock_t kt_lock;
 
     list_link_t kt_plink; /* Link on the process's thread list, p_threads */
-    list_link_t
-        kt_qlink; /* Link on some ktqueue if the thread is not running */
+    list_link_t kt_qlink; /* Link on some ktqueue if the thread is not running */
 
     list_t kt_mutexes;   /* List of owned mutexes, for use in debugging */
     long kt_recent_core; /* For SMP */

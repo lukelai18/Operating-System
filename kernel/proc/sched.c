@@ -163,7 +163,15 @@ void sched_init(void)
  */
 long sched_cancellable_sleep_on(ktqueue_t *queue, spinlock_t *lock)
 {
-    NOT_YET_IMPLEMENTED("PROCS: sched_cancellable_sleep_on");
+    curthr->kt_state=KT_SLEEP_CANCELLABLE; // Set current thread's state as KT_SLEEP_CANCELLABLE
+    if(curthr->kt_cancelled==1){ // Error condition
+        return -EINTR;
+    }
+    sched_switch(queue,lock); // Swtich the current thread
+    if(curthr->kt_cancelled==1){
+        return -EINTR;
+    }
+    // NOT_YET_IMPLEMENTED("PROCS: sched_cancellable_sleep_on");
     return 0;
 }
 
@@ -175,7 +183,14 @@ long sched_cancellable_sleep_on(ktqueue_t *queue, spinlock_t *lock)
  */
 void sched_cancel(kthread_t *thr)
 {
-    NOT_YET_IMPLEMENTED("PROCS: sched_cancel");
+    KASSERT(thr->kt_state==KT_SLEEP_CANCELLABLE||thr->kt_state==KT_SLEEP); // Ensure it's state
+    thr->kt_cancelled=1;
+    if(thr->kt_state==KT_SLEEP_CANCELLABLE){
+      // We do not need to use spinlock unless we do SMP
+      ktqueue_remove(thr->kt_wchan,thr);  // Remove it from the queue
+      thr->kt_state=KT_RUNNABLE;
+    }
+    //NOT_YET_IMPLEMENTED("PROCS: sched_cancel");
 }
 
 /*
@@ -208,6 +223,14 @@ void sched_cancel(kthread_t *thr)
  */
 void sched_switch(ktqueue_t *queue, spinlock_t *lock)
 {
+    KASSERT(curthr->kt_state!=KT_ON_CPU); // Make sure the current thread isn't running
+    intr_disable();
+    uint8_t tmp=intr_setipl(IPL_LOW);
+    curcore.kc_queue=queue;
+    context_switch(&curthr->kt_ctx,&curcore.kc_ctx);
+    intr_setipl(tmp);
+    intr_enable();
+    
     NOT_YET_IMPLEMENTED("PROCS: sched_switch");
 }
 
@@ -236,7 +259,13 @@ void sched_yield()
  */
 void sched_make_runnable(kthread_t *thr)
 {
-    NOT_YET_IMPLEMENTED("PROCS: sched_make_runnable");
+    uint8_t tmp=intr_setipl(IPL_HIGH); // Set interrupt priority
+    if(thr!=curthr){
+    thr->kt_state=KT_RUNNABLE; // Set the thread state
+    ktqueue_enqueue(&kt_runq, thr);
+    intr_setipl(tmp);
+    }
+    // NOT_YET_IMPLEMENTED("PROCS: sched_make_runnable");
 }
 
 /*
@@ -255,7 +284,11 @@ void sched_make_runnable(kthread_t *thr)
  */
 void sched_sleep_on(ktqueue_t *q, spinlock_t *lock)
 {
-    NOT_YET_IMPLEMENTED("PROCS: sched_sleep_on");
+    uint8_t tmp=intr_setipl(IPL_HIGH);
+    curthr->kt_state=KT_SLEEP; // Set the status
+    sched_switch(q,lock);
+    intr_setipl(tmp); // TODO: Do we need to set it back
+    //NOT_YET_IMPLEMENTED("PROCS: sched_sleep_on");
 }
 
 /*
@@ -271,7 +304,11 @@ void sched_sleep_on(ktqueue_t *q, spinlock_t *lock)
  */
 void sched_wakeup_on(ktqueue_t *q, kthread_t **ktp)
 {
-    NOT_YET_IMPLEMENTED("PROCS: sched_wakeup_on");
+    if(!sched_queue_empty(q)){
+        ktqueue_remove(q, *ktp);    // Taking it off from the queue  
+        (*ktp)->kt_state=KT_RUNNABLE; //TODO: Is it correct
+    }
+    //NOT_YET_IMPLEMENTED("PROCS: sched_wakeup_on");
 }
 
 /*
@@ -279,7 +316,11 @@ void sched_wakeup_on(ktqueue_t *q, kthread_t **ktp)
  */
 void sched_broadcast_on(ktqueue_t *q)
 {
-    NOT_YET_IMPLEMENTED("PROCS: sched_broadcast_on");
+    while(!sched_queue_empty(q)){
+        kthread_t *tmp=ktqueue_dequeue(q);  // Taking all the thread off      
+        tmp->kt_state=KT_RUNNABLE;
+    }
+    //NOT_YET_IMPLEMENTED("PROCS: sched_broadcast_on");
 }
 
 /*===============
