@@ -108,7 +108,7 @@ void context_switch(context_t *oldc, context_t *newc)
     uintptr_t new_curthr_paddr =
         pt_virt_to_phys_helper(newc->c_pml4, (uintptr_t)&curthr);
 
-    kthread_t *prev_curthr = curthr;
+    kthread_t *prev_curthr = curthr; // Store the current thread
     pt_set(newc->c_pml4);
     KASSERT(pt_get() == newc->c_pml4);
 

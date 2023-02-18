@@ -376,7 +376,7 @@ void core_switch()
         KASSERT(!intr_enabled());
         KASSERT(!curthr || curthr->kt_state != KT_ON_CPU);
 
-        if (curcore.kc_queue)
+        if (curcore.kc_queue)  
         {
             ktqueue_enqueue(curcore.kc_queue, curthr);
             spinlock_unlock(&curcore.kc_queue->tq_lock);
@@ -386,31 +386,31 @@ void core_switch()
             spinlock_unlock(curcore.kc_lock);
         }
 
-        curproc = &idleproc;
-        curthr = NULL;
-
-        kthread_t *next_thread = NULL;
+        curproc = &idleproc; // Set it as idle process
+        curthr = NULL;       // Set current thread as NULL
+ 
+        kthread_t *next_thread = NULL; // Initialize the next thread
 
         size_t idle_start = core_uptime();
         while (1)
         {
             spinlock_lock(&kt_runq.tq_lock);
-            next_thread = ktqueue_dequeue(&kt_runq);
+            next_thread = ktqueue_dequeue(&kt_runq); // Get a next thread
             spinlock_unlock(&kt_runq.tq_lock);
 
             if (!next_thread &&
                 core_uptime() - idle_start >= LOAD_BALANCING_IDLE_THRESHOLD)
                 next_thread = load_balance();
 
-            if (next_thread)
+            if (next_thread) 
                 break;
 
-            intr_wait();
+            intr_wait(); 
             intr_disable();
         }
 
         KASSERT(next_thread->kt_state == KT_RUNNABLE);
-        KASSERT(next_thread->kt_proc);
+        KASSERT(next_thread->kt_proc); // Make sure it is runnable and has corresponding process
 
         if (curcore.kc_id != next_thread->kt_recent_core)
         {
@@ -424,9 +424,9 @@ void core_switch()
             pt_virt_to_phys_helper(pt_get(), (uintptr_t)&next_thread);
         KASSERT(mapped_paddr == expected_paddr);
 
-        curthr = next_thread;
-        curthr->kt_state = KT_ON_CPU;
-        curproc = curthr->kt_proc;
+        curthr = next_thread; // Update the current thread
+        curthr->kt_state = KT_ON_CPU; // Set the state as running
+        curproc = curthr->kt_proc; // Update current process
         context_switch(&curcore.kc_ctx, &curthr->kt_ctx);
     }
 }
