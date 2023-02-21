@@ -71,6 +71,7 @@ kthread_t *kthread_create(proc_t *proc, kthread_func_t func, long arg1,
     kthread_t *new_kth;
     new_kth = slab_obj_alloc(kthread_allocator); // Point to the chunk of memory
     new_kth->kt_kstack=alloc_stack(); // Initialize the stack
+    context_setup(&new_kth->kt_ctx,func,arg1,arg2,new_kth->kt_kstack,DEFAULT_STACK_SIZE,curproc->p_pml4); 
     new_kth->kt_retval=NULL;
     new_kth->kt_errno=0;
     new_kth->kt_proc=proc;
@@ -80,12 +81,11 @@ kthread_t *kthread_create(proc_t *proc, kthread_func_t func, long arg1,
     spinlock_init(&new_kth->kt_lock); // Initialize the spinlock
     list_link_init(&new_kth->kt_plink);
     list_link_init(&new_kth->kt_qlink); //Initialize two list link
-    list_insert_tail(&proc->p_threads,&new_kth->kt_plink); // Add into proc's thread list
-    
     list_init(&new_kth->kt_mutexes); 
+    list_insert_tail(&proc->p_threads,&new_kth->kt_plink); // Add into proc's thread list
+    //list_insert_head(&proc->p_threads,&new_kth->kt_plink);
     new_kth->kt_recent_core=~0UL;
-    new_kth->kt_preemption_count=0;
-    context_setup(&new_kth->kt_ctx,func,arg1,arg2,new_kth->kt_kstack,DEFAULT_STACK_SIZE,curproc->p_pml4);  
+    new_kth->kt_preemption_count=0; 
     // NOT_YET_IMPLEMENTED("PROCS: kthread_create");
     return new_kth;
 }

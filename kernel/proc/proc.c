@@ -208,7 +208,7 @@ proc_t *proc_create(const char *name)
     sched_queue_init(&new_proc->p_wait);
 
     if(new_proc->p_pid==PID_INIT){ // If the new proc is the init process
-        new_proc=proc_initproc;
+        proc_initproc=new_proc;
     }
     // NOT_YET_IMPLEMENTED("PROCS: proc_create");
     return new_proc;
@@ -390,15 +390,13 @@ pid_t do_waitpid(pid_t pid, int *status, int options)
        return -ECHILD;
     }
     pid_t find_pid=-1;  // Set the initial value of children's pid
-    //int child_count=0; // The number of children process
     if(pid>0){
     while(1){
        list_iterate(&curproc->p_children,iter_chil,proc_t,p_child_link){    
-           if(iter_chil->p_pid==pid){ // Clean up certain process with certain pid         
-          // status=(int *)&iter_chil->p_status; // Optionally return the status
+           if(iter_chil->p_pid==pid){ // Clean up certain process with certain pid   
+            find_pid=iter_chil->p_pid; // Get the pid of the children 
            if(iter_chil->p_state==PROC_DEAD){
                iter_chil->p_status=(long)status;   // Set the status before destroy
-               find_pid=iter_chil->p_pid; // Get the pid of the children
                proc_destroy(iter_chil); // Destroy the child process 
                return find_pid;
            }
@@ -406,10 +404,10 @@ pid_t do_waitpid(pid_t pid, int *status, int options)
             sched_sleep_on(&curproc->p_wait,&curproc->p_children_lock); // Put parents into its own wait queue
            }
            }
-           if(find_pid==-1){ // If we didn't find a specified pid in the children list
+        }
+            if(find_pid==-1){ // If we didn't find a specified pid in the children list
                return -ECHILD;
            }
-        }
     }
         // TODO: Figure out how to return error condition
     }
@@ -429,7 +427,6 @@ pid_t do_waitpid(pid_t pid, int *status, int options)
         }
 }
    // NOT_YET_IMPLEMENTED("PROCS: do_waitpid");
-    //return find_pid;
 }
 
 /*
