@@ -186,13 +186,17 @@ proc_t *proc_lookup(pid_t pid)
 proc_t *proc_create(const char *name)
 {
     proc_t *new_proc;
-    new_proc->p_pid=_proc_getid(); // Get a new id
-    *new_proc->p_name=name; //Initialize the name TODO: Check it
     new_proc=slab_obj_alloc(proc_allocator); // Allocated new space for new_proc
+    new_proc->p_pid=_proc_getid(); // Get a new id
+    if(new_proc->p_pid==-1){ // ERROR check
+        slab_obj_free(proc_allocator, new_proc); // Free resources
+        return NULL;
+    }
+    strcpy(new_proc->p_name,name); //Initialize the name TODO: Check it
     new_proc->p_pml4=pt_create(); // New page table
     list_init(&new_proc->p_threads); // Initialize two lists
     list_init(&new_proc->p_children); 
-    new_proc->p_pproc=curproc; // How to set the parent process
+    new_proc->p_pproc=curproc; // set the parent process, which is current process
     
     list_link_init(&new_proc->p_child_link); // Initialize two list link
     list_link_init(&new_proc->p_list_link);
@@ -201,7 +205,7 @@ proc_t *proc_create(const char *name)
     spinlock_init(&new_proc->p_children_lock); // Initialize spin lock
     new_proc->p_status=0; 
     new_proc->p_state=PROC_RUNNING;
-    memset(&new_proc->p_wait,0,sizeof(ktqueue_t));
+    sched_queue_init(&new_proc->p_wait);
 
     if(new_proc->p_pid==PID_INIT){ // If the new proc is the init process
         new_proc=proc_initproc;
@@ -263,8 +267,7 @@ void proc_thread_exiting(void *retval)
     proc_cleanup((long)retval); // Clean up the current process   
     curthr->kt_state=KT_EXITED; // Set the exited state
     curthr->kt_retval=retval; 
-    sched_broadcast_on(&curproc->p_pproc->p_wait); // Wake the parent of the process up
-    
+    sched_broadcast_on(&curproc->p_pproc->p_wait); // Wake the parent of the process up    
     sched_switch(curthr->kt_wchan,&curthr->kt_lock); // Force the process die
     // NOT_YET_IMPLEMENTED("PROCS: proc_thread_exiting");
 }
@@ -387,42 +390,46 @@ pid_t do_waitpid(pid_t pid, int *status, int options)
        return -ECHILD;
     }
     pid_t find_pid=-1;  // Set the initial value of children's pid
-    int child_count=0; // The number of children process
+    //int child_count=0; // The number of children process
     if(pid>0){
+    while(1){
        list_iterate(&curproc->p_children,iter_chil,proc_t,p_child_link){    
-           if(iter_chil->p_pid==pid){ // Clean up certain process with certain pid
-           iter_chil->p_status=-1;   // Set the status before destroy
-           status=(int *)&iter_chil->p_status; // Optionally return the status
-           find_pid=iter_chil->p_pid; // Store the children's pid 
-           proc_t *tmp_proc=iter_chil;
-           kthread_t *tmp_thr=curthr; // Store the current thread and current process
-           sched_sleep_on(&iter_chil->p_wait,&curproc->p_children_lock); // Put a child process into wait queue
-           proc_destroy(iter_chil); // Destroy the child process
-           sched_wakeup_on(&tmp_proc->p_wait,&tmp_thr); // Wake up the current thread
+           if(iter_chil->p_pid==pid){ // Clean up certain process with certain pid         
+          // status=(int *)&iter_chil->p_status; // Optionally return the status
+           if(iter_chil->p_state==PROC_DEAD){
+               iter_chil->p_status=(long)status;   // Set the status before destroy
+               find_pid=iter_chil->p_pid; // Get the pid of the children
+               proc_destroy(iter_chil); // Destroy the child process 
+               return find_pid;
+           }
+           else{
+            sched_sleep_on(&curproc->p_wait,&curproc->p_children_lock); // Put parents into its own wait queue
+           }
            }
            if(find_pid==-1){ // If we didn't find a specified pid in the children list
                return -ECHILD;
            }
         }
+    }
         // TODO: Figure out how to return error condition
     }
     else if(pid==-1){
+        while(1){
         list_iterate(&curproc->p_children,iter_chil,proc_t,p_child_link){
-           iter_chil->p_status=-1;   // Set the status before destroy
-           status=(int *)&iter_chil->p_status; // Optionally return the status
-           if (child_count==0){ // If it is the first child we find
-              find_pid=iter_chil->p_pid;  // Store the first children's pid
-           }
-           proc_t *tmp_proc=iter_chil;
-           kthread_t *tmp_thr=curthr; // Store the current thread and current process
-           sched_sleep_on(&iter_chil->p_wait,&curproc->p_children_lock);
-           proc_destroy(iter_chil); // Destroy the child process
-           sched_wakeup_on(&tmp_proc->p_wait,&tmp_thr); // Wake up the current thread
-           child_count++; // Update the number of child process
+        if(iter_chil->p_state==PROC_DEAD){
+           iter_chil->p_status=(long)status;   // Set the status before destroy
+           find_pid=iter_chil->p_pid;
+           proc_destroy(iter_chil);
+           return find_pid;
         }
-    }   
-    NOT_YET_IMPLEMENTED("PROCS: do_waitpid");
-    return find_pid;
+        }   
+        if(find_pid==-1){  // If we cannot find a terminated child, put parents into sleep firstly
+            sched_sleep_on(&curproc->p_wait,&curproc->p_children_lock); // Put parents into its own wait queue
+        }
+        }
+}
+   // NOT_YET_IMPLEMENTED("PROCS: do_waitpid");
+    //return find_pid;
 }
 
 /*

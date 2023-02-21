@@ -224,12 +224,12 @@ void sched_cancel(kthread_t *thr)
 void sched_switch(ktqueue_t *queue, spinlock_t *lock)
 {
     KASSERT(curthr->kt_state!=KT_ON_CPU); // Make sure the current thread isn't running
-    intr_disable();
-    uint8_t tmp=intr_setipl(IPL_LOW);
-    curcore.kc_queue=queue;
-    context_switch(&curthr->kt_ctx,&curcore.kc_ctx);
-    intr_setipl(tmp);
-    intr_enable();
+    intr_disable(); // Disable interrupt
+    uint8_t tmp=intr_setipl(IPL_LOW); // Set the interrupt level
+    curcore.kc_queue=queue; // Set the queue
+    context_switch(&curthr->kt_ctx,&curcore.kc_ctx); // Swtich into context of current core
+    intr_setipl(tmp); // Return to the original interrupt level
+    intr_enable(); // Enable instruction
     
     NOT_YET_IMPLEMENTED("PROCS: sched_switch");
 }
