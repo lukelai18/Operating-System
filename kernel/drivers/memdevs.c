@@ -43,7 +43,11 @@ chardev_ops_t zero_dev_ops = {.read = zero_read,
  */
 void memdevs_init()
 {
-    NOT_YET_IMPLEMENTED("DRIVERS: memdevs_init");
+    kmalloc(sizeof(chardev_t)); // Malloc a space for null
+    chardev_register(chardev_lookup(MEM_NULL_DEVID));
+    kmalloc(sizeof(chardev_t)); // Malloc a space for 0
+    chardev_register(chardev_lookup(MEM_ZERO_DEVID));
+    // NOT_YET_IMPLEMENTED("DRIVERS: memdevs_init");
 }
 
 /**
@@ -58,8 +62,11 @@ void memdevs_init()
  */
 static ssize_t null_read(chardev_t *dev, size_t pos, void *buf, size_t count)
 {
-    NOT_YET_IMPLEMENTED("DRIVERS: null_read");
-    return -ENOMEM;
+    // TODO: Do we need to set priority here
+    //ldisc_wait_read(&cd_to_tty(dev)->tty_ldisc,&cd_to_tty(dev)->tty_lock);
+    // NOT_YET_IMPLEMENTED("DRIVERS: null_read");
+    return 0;
+    // return -ENOMEM;
 }
 
 /**
@@ -76,8 +83,10 @@ static ssize_t null_read(chardev_t *dev, size_t pos, void *buf, size_t count)
 static ssize_t null_write(chardev_t *dev, size_t pos, const void *buf,
                           size_t count)
 {
-    NOT_YET_IMPLEMENTED("DRIVERS: null_write");
-    return -ENOMEM;
+    //int written_bytes=0;
+    //written_bytes=vterminal_write(&cd_to_tty(dev)->tty_vterminal,buf,count);
+    // NOT_YET_IMPLEMENTED("DRIVERS: null_write");
+    return count;
 }
 
 /**
@@ -93,8 +102,12 @@ static ssize_t null_write(chardev_t *dev, size_t pos, const void *buf,
  */
 static ssize_t zero_read(chardev_t *dev, size_t pos, void *buf, size_t count)
 {
-    NOT_YET_IMPLEMENTED("DRIVERS: zero_read");
-    return 0;
+    //ldisc_wait_read(&cd_to_tty(dev)->tty_ldisc,&cd_to_tty(dev)->tty_lock);
+    memset(buf,'\0',count);
+    //int cur_count=0;
+    //cur_count=ldisc_read(&cd_to_tty(dev)->tty_ldisc, buf, count);
+    // NOT_YET_IMPLEMENTED("DRIVERS: zero_read");
+    return count;
 }
 
 /**
@@ -103,6 +116,7 @@ static ssize_t zero_read(chardev_t *dev, size_t pos, void *buf, size_t count)
  */
 static long zero_mmap(vnode_t *file, mobj_t **ret)
 {
-    NOT_YET_IMPLEMENTED("VM: zero_mmap");
+    //*ret=&file->vn_mobj;
+    // NOT_YET_IMPLEMENTED("VM: zero_mmap");
     return -1;
 }

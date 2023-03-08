@@ -72,8 +72,16 @@ void tty_init()
  */
 ssize_t tty_read(chardev_t *cdev, size_t pos, void *buf, size_t count)
 {
-    NOT_YET_IMPLEMENTED("DRIVERS: tty_read");
-    return -1;
+
+    kmutex_lock(&cd_to_tty(cdev)->tty_read_mutex); // Lock the read mutex firstly
+    ldisc_wait_read(&cd_to_tty(cdev)->tty_ldisc, &cd_to_tty(cdev)->tty_lock); // Wait 
+    uint8_t tmp=intr_setipl(INTR_KEYBOARD);
+    int cur_count=0;
+    cur_count=ldisc_read(&cd_to_tty(cdev)->tty_ldisc, buf, count);
+    intr_setipl(tmp); // Set ipl back
+    kmutex_unlock(&cd_to_tty(cdev)->tty_read_mutex);
+    // NOT_YET_IMPLEMENTED("DRIVERS: tty_read");
+    return cur_count;
 }
 
 /**
@@ -91,8 +99,14 @@ ssize_t tty_read(chardev_t *cdev, size_t pos, void *buf, size_t count)
  */
 ssize_t tty_write(chardev_t *cdev, size_t pos, const void *buf, size_t count)
 {
-    NOT_YET_IMPLEMENTED("DRIVERS: tty_write");
-    return -1;
+    kmutex_lock(&cd_to_tty(cdev)->tty_write_mutex);
+    uint8_t tmp=intr_setipl(INTR_KEYBOARD);
+    ssize_t written_bytes;
+    written_bytes=vterminal_write(&cd_to_tty(cdev)->tty_vterminal,buf,count);
+    intr_setipl(tmp);
+    // NOT_YET_IMPLEMENTED("DRIVERS: tty_write");
+    kmutex_unlock(&cd_to_tty(cdev)->tty_write_mutex);
+    return written_bytes;
 }
 
 static void tty_receive_char_multiplexer(uint8_t c)

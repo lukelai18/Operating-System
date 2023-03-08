@@ -305,8 +305,16 @@ void sched_sleep_on(ktqueue_t *q, spinlock_t *lock)
 void sched_wakeup_on(ktqueue_t *q, kthread_t **ktp)
 {
     if(!sched_queue_empty(q)){
-        ktqueue_remove(q, *ktp);    // Taking it off from the queue  
-        (*ktp)->kt_state=KT_RUNNABLE; //TODO: Is it correct
+        kthread_t *tmp=ktqueue_dequeue(q);  // Taking all the thread off 
+        if(ktp!=NULL){
+        *ktp=tmp;     
+        }
+        sched_make_runnable(tmp); // Make thread runable and put it into runqueue
+    }
+    else{
+        if(ktp!=NULL){
+        *ktp=NULL;
+        }
     }
     //NOT_YET_IMPLEMENTED("PROCS: sched_wakeup_on");
 }
@@ -318,7 +326,7 @@ void sched_broadcast_on(ktqueue_t *q)
 {
     while(!sched_queue_empty(q)){
         kthread_t *tmp=ktqueue_dequeue(q);  // Taking all the thread off      
-        tmp->kt_state=KT_RUNNABLE;
+        sched_make_runnable(tmp); // Make thread runable and put it into runqueue
     }
     //NOT_YET_IMPLEMENTED("PROCS: sched_broadcast_on");
 }

@@ -83,7 +83,6 @@ kthread_t *kthread_create(proc_t *proc, kthread_func_t func, long arg1,
     list_link_init(&new_kth->kt_qlink); //Initialize two list link
     list_init(&new_kth->kt_mutexes); 
     list_insert_tail(&proc->p_threads,&new_kth->kt_plink); // Add into proc's thread list
-    //list_insert_head(&proc->p_threads,&new_kth->kt_plink);
     new_kth->kt_recent_core=~0UL;
     new_kth->kt_preemption_count=0; 
     // NOT_YET_IMPLEMENTED("PROCS: kthread_create");

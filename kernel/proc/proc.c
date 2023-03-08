@@ -200,7 +200,8 @@ proc_t *proc_create(const char *name)
     
     list_link_init(&new_proc->p_child_link); // Initialize two list link
     list_link_init(&new_proc->p_list_link);
-    list_insert_tail(&proc_list,&new_proc->p_child_link); //  Insert the new_proc into the proc_list
+    list_insert_tail(&proc_list,&new_proc->p_list_link); //  Insert the new_proc into the proc_list
+    list_insert_tail(&curproc->p_children,&new_proc->p_child_link); // Insert it into parents' children list
 
     spinlock_init(&new_proc->p_children_lock); // Initialize spin lock
     new_proc->p_status=0; 
@@ -235,12 +236,11 @@ void proc_cleanup(long status)
 {
     curproc->p_state=PROC_DEAD;
     curproc->p_status=status;         // Set current process's state and status
-    if(curproc->p_pid==PID_INIT){ // If the current process is initial process
+    if(curproc->p_pid==PID_INIT){  // If the current process is initial process
        initproc_finish(); // Shup down the weenix
     }
     else{
         list_iterate(&curproc->p_children,p_child,proc_t,p_child_link){ // Loop the child list
-               // TODO: Check it later
                list_insert_tail(&proc_initproc->p_children,&curproc->p_child_link); // Add the children into 
                                                                                    // initial process's list                                                                                  
                list_remove(&curproc->p_child_link); // Remove children in current process's children link
@@ -267,8 +267,9 @@ void proc_thread_exiting(void *retval)
     proc_cleanup((long)retval); // Clean up the current process   
     curthr->kt_state=KT_EXITED; // Set the exited state
     curthr->kt_retval=retval; 
-    sched_broadcast_on(&curproc->p_pproc->p_wait); // Wake the parent of the process up    
-    sched_switch(curthr->kt_wchan,&curthr->kt_lock); // Force the process die
+    sched_broadcast_on(&curproc->p_pproc->p_wait); // Wake the parent of the process up   
+    sched_switch(0,0); // Force the process die, and don't put current thread 
+    // into queue, so set argument as 0,0
     // NOT_YET_IMPLEMENTED("PROCS: proc_thread_exiting");
 }
 
@@ -305,7 +306,6 @@ void proc_kill_all()
                  proc_kill(iter_proc,-1); // Cancel the process
            }
     }
-    // TODO: The same with above
     do_exit(-1); // Kill the current process
     //NOT_YET_IMPLEMENTED("PROCS: proc_kill_all");
 }
@@ -321,7 +321,7 @@ void proc_kill_all()
 void proc_destroy(proc_t *proc)
 {
     spinlock_lock(&proc_list_lock);
-    list_remove(&proc->p_list_link);
+    list_remove(&proc->p_list_link); // Remove it from process list
     spinlock_unlock(&proc_list_lock);
 
     list_iterate(&proc->p_threads, thr, kthread_t, kt_plink)
@@ -382,9 +382,11 @@ void proc_destroy(proc_t *proc)
  * it does not have to return the one that exited earliest. // TODO: Not sure what this mean
  */
 pid_t do_waitpid(pid_t pid, int *status, int options)
+// Need to return value to status, this is why we deference it, which means that we can change the content inside
+// this address. In addition, a function cannnot return two variables, so we set status here
 {
     if((pid<=0&&pid!=-1)||options!=0){
-        return -ENOTSUP; // TODO: Make sure the error code is correct
+        return -ENOTSUP; 
     }
     if(pid==-1&& list_empty(&curproc->p_children)){ // If the process has no children
        return -ECHILD;
@@ -396,7 +398,9 @@ pid_t do_waitpid(pid_t pid, int *status, int options)
            if(iter_chil->p_pid==pid){ // Clean up certain process with certain pid   
             find_pid=iter_chil->p_pid; // Get the pid of the children 
            if(iter_chil->p_state==PROC_DEAD){
-               iter_chil->p_status=(long)status;   // Set the status before destroy
+               *status= iter_chil->p_status;   // Set the status before destroy
+               list_remove(&iter_chil->p_child_link); // Remove it from parents children link, since we 
+                // didn't do it in proc_destory
                proc_destroy(iter_chil); // Destroy the child process 
                return find_pid;
            }
@@ -415,8 +419,9 @@ pid_t do_waitpid(pid_t pid, int *status, int options)
         while(1){
         list_iterate(&curproc->p_children,iter_chil,proc_t,p_child_link){
         if(iter_chil->p_state==PROC_DEAD){
-           iter_chil->p_status=(long)status;   // Set the status before destroy
+           *status= iter_chil->p_status;   // Set the status before destroy
            find_pid=iter_chil->p_pid;
+           list_remove(&iter_chil->p_child_link);
            proc_destroy(iter_chil);
            return find_pid;
         }
