@@ -3,7 +3,7 @@
 #include "types.h"
 #include <proc/kmutex.h>
 
-#define LDISC_BUFFER_SIZE 128
+#define LDISC_BUFFER_SIZE 8
 
 /**
  * The line discipline is implemented as a circular buffer containing two 

@@ -35,6 +35,7 @@
 #include "test/driverstest.h"
 #include "test/proctest.h"
 #include "test/vmtest.h"
+#include "test/kshell/kshell.h"
 
 GDB_DEFINE_HOOK(boot)
 
@@ -156,7 +157,8 @@ static void make_devices()
  */
 static void *initproc_run(long arg1, void *arg2)
 {
-   proctest_main(arg1,arg2); // For test
+   //proctest_main(arg1,arg2); // For test
+   driverstest_main(0, NULL);
 #ifdef __VFS__
     dbg(DBG_INIT, "Initializing VFS...\n");
     vfs_init();
