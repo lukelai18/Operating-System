@@ -151,46 +151,57 @@ void ldisc_key_pressed(ldisc_t *ldisc, char c)
     if(ldisc->ldisc_full==1){ // If the buffer is full
         return;      
     }
-    if (c==EOT) {  // If we encounter Ctrl+D
-        ldisc->ldisc_buffer[ldisc->ldisc_head]=c; // Put EOT into buffer
-        ldisc->ldisc_head=(ldisc->ldisc_head+1)%LDISC_BUFFER_SIZE;
-        ldisc->ldisc_cooked=ldisc->ldisc_head; // Cook the buffer
-        sched_wakeup_on(&ldisc->ldisc_read_queue,NULL);
-    }
-    else if (c==ETX) { // We need to discard all the element we put into buffer
-        ldisc->ldisc_head=ldisc->ldisc_cooked; // Discard the raw item
-        vterminal_write(&ldisc_to_tty(ldisc)->tty_vterminal,"\n",1); // Output \n to the terminal
-        return;
-    }
-    else if(c=='\n'){ // When we encounter next line
-        ldisc->ldisc_buffer[ldisc->ldisc_head]=c;
-        ldisc->ldisc_head=(ldisc->ldisc_head+1)%LDISC_BUFFER_SIZE;
-        ldisc->ldisc_cooked=ldisc->ldisc_head; // Set it as cooked
-        sched_wakeup_on(&ldisc->ldisc_read_queue,NULL);
-        vterminal_write(&ldisc_to_tty(ldisc)->tty_vterminal,"\n",1);
-    }
-    else if(c=='\b'){ // When we encounter backspace
+    // If we encounter special characters, this type of character should be handled by normal and almost full
+    // situation
+    if(c==EOT||c==ETX||c=='\n'||c=='\b'){ 
+        if (c==EOT) {  // If we encounter Ctrl+D
+            ldisc->ldisc_buffer[ldisc->ldisc_head]=c; // Put EOT into buffer
+            ldisc->ldisc_head=(ldisc->ldisc_head+1)%LDISC_BUFFER_SIZE;
+            ldisc->ldisc_cooked=ldisc->ldisc_head; // Cook the buffer
+            sched_wakeup_on(&ldisc->ldisc_read_queue,NULL);
+        }
+        else if (c==ETX) { // We need to discard all the element we put into buffer
+            ldisc->ldisc_head=ldisc->ldisc_cooked; // Discard the raw item
+            vterminal_write(&ldisc_to_tty(ldisc)->tty_vterminal,"\n",1); // Output \n to the terminal
+        }
+        else if(c=='\n'){ // When we encounter next line
+            ldisc->ldisc_buffer[ldisc->ldisc_head]=c;
+            ldisc->ldisc_head=(ldisc->ldisc_head+1)%LDISC_BUFFER_SIZE;
+            ldisc->ldisc_cooked=ldisc->ldisc_head; // Set it as cooked
+            sched_wakeup_on(&ldisc->ldisc_read_queue,NULL);
+            vterminal_write(&ldisc_to_tty(ldisc)->tty_vterminal,"\n",1);
+        }
+        else if(c=='\b'){ // When we encounter backspace
         // If the head has move to the first position in the buffer and the raw content is not empty
-        if(ldisc->ldisc_head==0 && ldisc->ldisc_head!=ldisc->ldisc_cooked){ 
-            //We don't need to replace the deleted element's content with 0
-            ldisc->ldisc_head=LDISC_BUFFER_SIZE-1; // Update the value of head
+            if(ldisc->ldisc_head==0 && ldisc->ldisc_head!=ldisc->ldisc_cooked){ 
+            // We don't need to replace the deleted element's content with 0
+                ldisc->ldisc_head=LDISC_BUFFER_SIZE-1; // Update the value of head
+            }
+            else if(ldisc->ldisc_head!=ldisc->ldisc_cooked){ // Ensure the raw part is not empty
+                ldisc->ldisc_head--;
+            }
+            vterminal_write(&ldisc_to_tty(ldisc)->tty_vterminal,"\b",1); // Write '\b' to terminal
         }
-        else if(ldisc->ldisc_head!=ldisc->ldisc_cooked){ // Ensure the raw part is not empty
-            ldisc->ldisc_head--;
-        }
-        vterminal_write(&ldisc_to_tty(ldisc)->tty_vterminal,"\b",1); // Write '\b' to terminal
-        return;
+        // If the head has beyond the range of buffer, we need to update the value of head
     }
-    if (ldisc->ldisc_head == ldisc->ldisc_tail && (c == '\n' || c == EOT)) {
-        ldisc->ldisc_full = 1;
-        return; 
-    }
-    if((ldisc->ldisc_head+1) % LDISC_BUFFER_SIZE != ldisc->ldisc_tail){ // If there are only one byte left in the line discipline
+    // This condition check that the buffer is not full, which means that the head+1 didn't hit
+    // the tail(Raw part is from cooked(include) to head(not include), cooked part is from tail
+    // (included) to cooked(not included, if the head is just near the tail, which means that it's alomost full)
+    else if((ldisc->ldisc_head+1) % LDISC_BUFFER_SIZE != ldisc->ldisc_tail){  // Normol situation
         ldisc->ldisc_buffer[ldisc->ldisc_head]=c;
         ldisc->ldisc_head++;
         vterminal_key_pressed(&ldisc_to_tty(ldisc)->tty_vterminal);
-        return;
     }
+    // To update the head when it beyond the range of buffer
+    if(ldisc->ldisc_head==LDISC_BUFFER_SIZE){
+        ldisc->ldisc_head=0;
+    }
+    // To handle the situation in which the buffer is almost full and it received EOT and '\n'
+    // which means there are only one byte left in the line discipline
+    if (ldisc->ldisc_head == ldisc->ldisc_tail &&(c==EOT||c=='\n')) {
+        ldisc->ldisc_full = 1;
+    }
+    return; 
     // NOT_YET_IMPLEMENTED("DRIVERS: ldisc_key_pressed");
 }
 
