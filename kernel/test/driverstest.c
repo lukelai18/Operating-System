@@ -31,15 +31,15 @@ long test_basic_line_discipline() {
     chardev_t* cd = chardev_lookup(MKDEVID(TTY_MAJOR, 0)); 
     tty_t* tty = cd_to_tty(cd); 
     ldisc_t* ldisc = &tty->tty_ldisc; 
-    ldisc_key_pressed(ldisc, 't'); 
+    ldisc_key_pressed(ldisc, 't');  // Input 't'
 
-    test_assert(ldisc->ldisc_buffer[ldisc->ldisc_tail] == 't', 
+    test_assert(ldisc->ldisc_buffer[ldisc->ldisc_tail] == 't',  
                 "character not inputted into buffer correctly"); 
     test_assert(ldisc->ldisc_head != ldisc->ldisc_cooked && ldisc->ldisc_tail != ldisc->ldisc_head, 
                 "pointers are updated correctly");
 
     size_t previous_head_val = ldisc->ldisc_head; 
-    ldisc_key_pressed(ldisc, '\n'); 
+    ldisc_key_pressed(ldisc, '\n');  // Input next line
     test_assert(ldisc->ldisc_head == previous_head_val + 1, 
                 "ldisc_head should have been incremented past newline character");
     test_assert(ldisc->ldisc_cooked == ldisc->ldisc_head, 

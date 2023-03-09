@@ -208,9 +208,17 @@ void ldisc_key_pressed(ldisc_t *ldisc, char c)
 size_t ldisc_get_current_line_raw(ldisc_t *ldisc, char *s)
 {
     size_t cur_count=0;
-    for(size_t i=ldisc->ldisc_cooked;i<LDISC_BUFFER_SIZE+ldisc->ldisc_head-1;i++){
-        s[cur_count]=ldisc->ldisc_buffer[i%LDISC_BUFFER_SIZE]; // Add it into buffer
-        cur_count++;
+    if(ldisc->ldisc_head<ldisc->ldisc_cooked){
+        for(size_t i=ldisc->ldisc_cooked;i<LDISC_BUFFER_SIZE+ldisc->ldisc_head-1;i++){
+            s[cur_count]=ldisc->ldisc_buffer[i%LDISC_BUFFER_SIZE]; // Add it into buffer
+            cur_count++;
+        }
+    }
+    else{
+          for(size_t i=ldisc->ldisc_cooked;i<ldisc->ldisc_head;i++){
+          s[cur_count]=ldisc->ldisc_buffer[i]; // Add it into character s
+          cur_count++;
+       }
     }
    // NOT_YET_IMPLEMENTED("DRIVERS: ldisc_get_current_line_raw");
     return cur_count;
