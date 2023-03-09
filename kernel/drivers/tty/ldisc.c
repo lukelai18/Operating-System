@@ -72,23 +72,20 @@ size_t ldisc_read(ldisc_t *ldisc, char *buf, size_t count)
     for(size_t i=ldisc->ldisc_tail;i<LDISC_BUFFER_SIZE+ldisc->ldisc_cooked-1&&
         ldisc->ldisc_cooked!=ldisc->ldisc_tail;i++){
         if(ldisc->ldisc_buffer[i%LDISC_BUFFER_SIZE]==EOT){
-            ldisc->ldisc_tail++;
+            ldisc->ldisc_tail=(ldisc->ldisc_tail+1)%LDISC_BUFFER_SIZE;
             return cur_count; // Stop reading and return
         }
         if(ldisc->ldisc_buffer[i%LDISC_BUFFER_SIZE]=='\n'){
             buf[cur_count]=ldisc->ldisc_buffer[i%LDISC_BUFFER_SIZE];
-            ldisc->ldisc_tail++;          
+            ldisc->ldisc_tail=(ldisc->ldisc_tail+1)%LDISC_BUFFER_SIZE;          
             cur_count++;
             return cur_count; // When encounter a new line symbol
         }
         buf[cur_count]=ldisc->ldisc_buffer[i%LDISC_BUFFER_SIZE];
-        ldisc->ldisc_tail++;
+        ldisc->ldisc_tail=(ldisc->ldisc_tail+1)%LDISC_BUFFER_SIZE;
         cur_count++;
         if(cur_count==count){ // If it has reach count bytes
             return count;           
-        }
-        if(ldisc->ldisc_tail==LDISC_BUFFER_SIZE){
-            ldisc->ldisc_tail=0;
         }
     }
     return cur_count;
@@ -191,10 +188,6 @@ void ldisc_key_pressed(ldisc_t *ldisc, char c)
         ldisc->ldisc_buffer[ldisc->ldisc_head]=c;
         ldisc->ldisc_head++;
         vterminal_key_pressed(&ldisc_to_tty(ldisc)->tty_vterminal);
-    }
-    // To update the head when it beyond the range of buffer
-    if(ldisc->ldisc_head==LDISC_BUFFER_SIZE){
-        ldisc->ldisc_head=0;
     }
     // To handle the situation in which the buffer is almost full and it received EOT and '\n'
     // which means there are only one byte left in the line discipline
