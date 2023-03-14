@@ -42,7 +42,7 @@ long ldisc_wait_read(ldisc_t *ldisc, spinlock_t *lock)
 {
     // Condition: When there are no cooked characters in buffer
     long ret;
-    while(ldisc->ldisc_cooked==ldisc->ldisc_tail){
+    while(ldisc->ldisc_tail ==ldisc->ldisc_cooked && (!ldisc->ldisc_full)){ // When it is full      
       ret=sched_cancellable_sleep_on(&ldisc->ldisc_read_queue,lock); // Put current thread into sleep
     }   
     // NOT_YET_IMPLEMENTED("DRIVERS: ldisc_wait_read");
@@ -69,23 +69,25 @@ size_t ldisc_read(ldisc_t *ldisc, char *buf, size_t count)
     // TODO: Find a way to lock the buffer
     size_t cur_count=0; // Compute the current count in provided buffer buf
     // If the ldisc_cooked didn't reach the end of the buffer
-    for(size_t i=ldisc->ldisc_tail;i<LDISC_BUFFER_SIZE+ldisc->ldisc_cooked-1&&
-        ldisc->ldisc_cooked!=ldisc->ldisc_tail;i++){
-        if(ldisc->ldisc_buffer[i%LDISC_BUFFER_SIZE]==EOT){
-            ldisc->ldisc_tail=(ldisc->ldisc_tail+1)%LDISC_BUFFER_SIZE;
-            return cur_count; // Stop reading and return
+    // if(ldisc->ldisc_tail ==ldisc->ldisc_cooked && (ldisc->ldisc_full==1)){
+    //     sched_cancellable_sleep_on(&ldisc->ldisc_read_queue, NULL);
+    //     return cur_count;
+    // }
+    for(cur_count=0;cur_count<=count;cur_count++){
+        if(ldisc->ldisc_buffer[ldisc->ldisc_tail]==EOT){
+            ldisc->ldisc_tail=(ldisc->ldisc_tail+1)%LDISC_BUFFER_SIZE;          
         }
-        if(ldisc->ldisc_buffer[i%LDISC_BUFFER_SIZE]=='\n'){
-            buf[cur_count]=ldisc->ldisc_buffer[i%LDISC_BUFFER_SIZE];
+        else if(ldisc->ldisc_buffer[ldisc->ldisc_tail]=='\n'){
+            buf[cur_count]=ldisc->ldisc_buffer[ldisc->ldisc_tail%LDISC_BUFFER_SIZE];
             ldisc->ldisc_tail=(ldisc->ldisc_tail+1)%LDISC_BUFFER_SIZE;          
             cur_count++;
-            return cur_count; // When encounter a new line symbol
         }
-        buf[cur_count]=ldisc->ldisc_buffer[i%LDISC_BUFFER_SIZE];
-        ldisc->ldisc_tail=(ldisc->ldisc_tail+1)%LDISC_BUFFER_SIZE;
-        cur_count++;
-        if(cur_count==count){ // If it has reach count bytes
-            return count;           
+        else{
+            buf[cur_count]=ldisc->ldisc_buffer[ldisc->ldisc_tail];
+            ldisc->ldisc_tail=(ldisc->ldisc_tail+1)%LDISC_BUFFER_SIZE;
+        }
+        if(ldisc->ldisc_full==1){
+            ldisc->ldisc_full=0;
         }
     }
     return cur_count;
@@ -151,7 +153,7 @@ void ldisc_key_pressed(ldisc_t *ldisc, char c)
     // If we encounter special characters, this type of character should be handled by normal and almost full
     // situation
     if(c==EOT||c==ETX||c=='\n'||c=='\b'){ 
-        if (c==EOT) {  // If we encounter Ctrl+D
+        if (c==EOT) {  // If we encounter Ctrl+D, It should execute whatever was typed before, but not move to next line
             ldisc->ldisc_buffer[ldisc->ldisc_head]=c; // Put EOT into buffer
             ldisc->ldisc_head=(ldisc->ldisc_head+1)%LDISC_BUFFER_SIZE;
             ldisc->ldisc_cooked=ldisc->ldisc_head; // Cook the buffer
@@ -168,23 +170,26 @@ void ldisc_key_pressed(ldisc_t *ldisc, char c)
             sched_wakeup_on(&ldisc->ldisc_read_queue,NULL);
             vterminal_write(&ldisc_to_tty(ldisc)->tty_vterminal,"\n",1);
         }
-        else if(c=='\b'){ // When we encounter backspace
+        else if(c=='\b'){ // When we encounter backspace, remove the last character pressed
         // If the head has move to the first position in the buffer and the raw content is not empty
-            if(ldisc->ldisc_head==0 && ldisc->ldisc_head!=ldisc->ldisc_cooked){ 
-            // We don't need to replace the deleted element's content with 0
-                ldisc->ldisc_head=LDISC_BUFFER_SIZE-1; // Update the value of head
+            if(ldisc->ldisc_head!=ldisc->ldisc_cooked){ // Ensure the raw part is not empty
+                if(ldisc->ldisc_head==0 ){ 
+                // We don't need to replace the deleted element's content with 0
+                    ldisc->ldisc_head=LDISC_BUFFER_SIZE-1; // Update the value of head
+                }
+                else { // The head is not in the first element of buffer
+                    ldisc->ldisc_head--;
+                }
+                vterminal_write(&ldisc_to_tty(ldisc)->tty_vterminal,"\b",1); // Write '\b' to terminal
             }
-            else if(ldisc->ldisc_head!=ldisc->ldisc_cooked){ // Ensure the raw part is not empty
-                ldisc->ldisc_head--;
-            }
-            vterminal_write(&ldisc_to_tty(ldisc)->tty_vterminal,"\b",1); // Write '\b' to terminal
         }
         // If the head has beyond the range of buffer, we need to update the value of head
     }
     // This condition check that the buffer is not full, which means that the head+1 didn't hit
     // the tail(Raw part is from cooked(include) to head(not include), cooked part is from tail
     // (included) to cooked(not included, if the head is just near the tail, which means that it's alomost full)
-    else if((ldisc->ldisc_head+1) % LDISC_BUFFER_SIZE != ldisc->ldisc_tail){  // Normol situation
+    else if((ldisc->ldisc_head+1) % LDISC_BUFFER_SIZE != ldisc->ldisc_tail){  // Normal situation, 
+        // when it is not almost full, which means that there are at least two bytes left
         ldisc->ldisc_buffer[ldisc->ldisc_head]=c;
         ldisc->ldisc_head++;
         vterminal_key_pressed(&ldisc_to_tty(ldisc)->tty_vterminal);
@@ -208,17 +213,10 @@ void ldisc_key_pressed(ldisc_t *ldisc, char c)
 size_t ldisc_get_current_line_raw(ldisc_t *ldisc, char *s)
 {
     size_t cur_count=0;
-    if(ldisc->ldisc_head<ldisc->ldisc_cooked){
-        for(size_t i=ldisc->ldisc_cooked;i<LDISC_BUFFER_SIZE+ldisc->ldisc_head-1;i++){
-            s[cur_count]=ldisc->ldisc_buffer[i%LDISC_BUFFER_SIZE]; // Add it into buffer
-            cur_count++;
-        }
-    }
-    else{
-          for(size_t i=ldisc->ldisc_cooked;i<ldisc->ldisc_head;i++){
-          s[cur_count]=ldisc->ldisc_buffer[i]; // Add it into character s
-          cur_count++;
-       }
+    // If (ldisc->ldisc_cooked+cur_count)%LDISC_BUFFER_SIZE==ldisc->ldisc_head, which means that it is already full
+    // If it is full, the only possible byte are EOT and '\n', we don't need to get it
+    for(cur_count=0;(ldisc->ldisc_cooked+cur_count)%LDISC_BUFFER_SIZE!=ldisc->ldisc_head;cur_count++){
+        s[cur_count]=ldisc->ldisc_buffer[(ldisc->ldisc_cooked+cur_count)%LDISC_BUFFER_SIZE]; // Add it into buffer 
     }
    // NOT_YET_IMPLEMENTED("DRIVERS: ldisc_get_current_line_raw");
     return cur_count;

@@ -72,7 +72,6 @@ void tty_init()
  */
 ssize_t tty_read(chardev_t *cdev, size_t pos, void *buf, size_t count)
 {
-
     kmutex_lock(&cd_to_tty(cdev)->tty_read_mutex); // Lock the read mutex firstly
     ldisc_wait_read(&cd_to_tty(cdev)->tty_ldisc, &cd_to_tty(cdev)->tty_lock); // Wait 
     uint8_t tmp=intr_setipl(INTR_KEYBOARD);
