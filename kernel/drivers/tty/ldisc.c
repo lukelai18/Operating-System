@@ -42,7 +42,9 @@ long ldisc_wait_read(ldisc_t *ldisc, spinlock_t *lock)
 {
     // Condition: When there are no cooked characters in buffer
     long ret;
-    while(ldisc->ldisc_tail ==ldisc->ldisc_cooked && (!ldisc->ldisc_full)){ // When it is full      
+    // If it is full, it must has something to read because it should be cooked
+    // When the tail is equal to cooked and it is not full, which means that there are no cooked characters
+    while(ldisc->ldisc_tail ==ldisc->ldisc_cooked && (!ldisc->ldisc_full)){      
       ret=sched_cancellable_sleep_on(&ldisc->ldisc_read_queue,lock); // Put current thread into sleep
     }   
     // NOT_YET_IMPLEMENTED("DRIVERS: ldisc_wait_read");
@@ -70,7 +72,6 @@ size_t ldisc_read(ldisc_t *ldisc, char *buf, size_t count)
     size_t cur_count=0; // Compute the current count in provided buffer buf
     // If the ldisc_cooked didn't reach the end of the buffer
     // if(ldisc->ldisc_tail ==ldisc->ldisc_cooked && (ldisc->ldisc_full==1)){
-    //     sched_cancellable_sleep_on(&ldisc->ldisc_read_queue, NULL);
     //     return cur_count;
     // }
     for(cur_count=0;cur_count<=count;cur_count++){
@@ -157,7 +158,7 @@ void ldisc_key_pressed(ldisc_t *ldisc, char c)
             ldisc->ldisc_buffer[ldisc->ldisc_head]=c; // Put EOT into buffer
             ldisc->ldisc_head=(ldisc->ldisc_head+1)%LDISC_BUFFER_SIZE;
             ldisc->ldisc_cooked=ldisc->ldisc_head; // Cook the buffer
-            sched_wakeup_on(&ldisc->ldisc_read_queue,NULL);
+            sched_wakeup_on(&ldisc->ldisc_read_queue,NULL); // Begin to read
         }
         else if (c==ETX) { // We need to discard all the element we put into buffer
             ldisc->ldisc_head=ldisc->ldisc_cooked; // Discard the raw item
@@ -195,7 +196,8 @@ void ldisc_key_pressed(ldisc_t *ldisc, char c)
         vterminal_key_pressed(&ldisc_to_tty(ldisc)->tty_vterminal);
     }
     // To handle the situation in which the buffer is almost full and it received EOT and '\n'
-    // which means there are only one byte left in the line discipline
+    // which means there are only one byte left in the line discipline. After receive EOT and
+    // '\n', it's completely full.
     if (ldisc->ldisc_head == ldisc->ldisc_tail &&(c==EOT||c=='\n')) {
         ldisc->ldisc_full = 1;
     }
