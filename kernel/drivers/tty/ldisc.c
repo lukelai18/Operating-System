@@ -76,19 +76,27 @@ size_t ldisc_read(ldisc_t *ldisc, char *buf, size_t count)
     // }
     for(cur_count=0;cur_count<=count;cur_count++){
         if(ldisc->ldisc_buffer[ldisc->ldisc_tail]==EOT){
-            ldisc->ldisc_tail=(ldisc->ldisc_tail+1)%LDISC_BUFFER_SIZE;          
+            ldisc->ldisc_tail=(ldisc->ldisc_tail+1)%LDISC_BUFFER_SIZE;
+            if(ldisc->ldisc_full==1){
+                ldisc->ldisc_full=0;
+            }  
+            return cur_count;        
         }
         else if(ldisc->ldisc_buffer[ldisc->ldisc_tail]=='\n'){
             buf[cur_count]=ldisc->ldisc_buffer[ldisc->ldisc_tail%LDISC_BUFFER_SIZE];
             ldisc->ldisc_tail=(ldisc->ldisc_tail+1)%LDISC_BUFFER_SIZE;          
             cur_count++;
+            if(ldisc->ldisc_full==1){
+                ldisc->ldisc_full=0;
+            }  
+            return cur_count;
         }
         else{
             buf[cur_count]=ldisc->ldisc_buffer[ldisc->ldisc_tail];
             ldisc->ldisc_tail=(ldisc->ldisc_tail+1)%LDISC_BUFFER_SIZE;
-        }
-        if(ldisc->ldisc_full==1){
-            ldisc->ldisc_full=0;
+            if(ldisc->ldisc_full==1){
+                ldisc->ldisc_full=0;
+            }  
         }
     }
     return cur_count;
@@ -192,7 +200,7 @@ void ldisc_key_pressed(ldisc_t *ldisc, char c)
     else if((ldisc->ldisc_head+1) % LDISC_BUFFER_SIZE != ldisc->ldisc_tail){  // Normal situation, 
         // when it is not almost full, which means that there are at least two bytes left
         ldisc->ldisc_buffer[ldisc->ldisc_head]=c;
-        ldisc->ldisc_head++;
+        ldisc->ldisc_head=(ldisc->ldisc_head+1)%LDISC_BUFFER_SIZE;
         vterminal_key_pressed(&ldisc_to_tty(ldisc)->tty_vterminal);
     }
     // To handle the situation in which the buffer is almost full and it received EOT and '\n'
