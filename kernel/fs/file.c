@@ -17,7 +17,7 @@ void fref(file_t *f)
 {
     KASSERT(f->f_mode <= FMODE_MAX_VALUE && f->f_vnode);
 
-    f->f_refcount++;
+    f->f_refcount++; // Increment the reference count
 
     if (f->f_vnode)
     {
@@ -42,7 +42,7 @@ void fref(file_t *f)
 file_t *fcreate(int fd, vnode_t *vnode, unsigned int mode)
 {
     KASSERT(!curproc->p_files[fd]);
-    file_t *file = slab_obj_alloc(file_allocator);
+    file_t *file = slab_obj_alloc(file_allocator); 
     if (!file)
         return NULL;
     memset(file, 0, sizeof(file_t));
@@ -67,7 +67,7 @@ file_t *fget(int fd)
         return NULL;
     file_t *file = curproc->p_files[fd];
     if (file)
-        fref(file);
+        fref(file); // Increment the reference count on the given file
     return file;
 }
 
@@ -101,12 +101,12 @@ void fput(file_t **filep)
         dbg(DBG_FREF, "fput: 0x%p down to %lu\n", file, file->f_refcount);
     }
 
-    if (!file->f_refcount)
+    if (!file->f_refcount) // If the refcount drop to 0
     {
         if (file->f_vnode)
         {
             vlock(file->f_vnode);
-            if (file->f_vnode->vn_ops->release)
+            if (file->f_vnode->vn_ops->release)  // call release
                 file->f_vnode->vn_ops->release(file->f_vnode, file);
             vput_locked(&file->f_vnode);
         }

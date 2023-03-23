@@ -452,18 +452,18 @@ static ssize_t ramfs_lookup(vnode_t *dir, const char *name, size_t namelen,
     ramfs_inode_t *inode = VNODE_TO_RAMFSINODE(dir);
     ramfs_dirent_t *entry = (ramfs_dirent_t *)inode->rf_mem;
 
-    for (i = 0; i < RAMFS_MAX_DIRENT; i++, entry++)
+    for (i = 0; i < RAMFS_MAX_DIRENT; i++, entry++)  
     {
-        if (name_match(entry->rd_name, name, namelen))
+        if (name_match(entry->rd_name, name, namelen)) // If we find the name
         {
             if (dir->vn_vno != entry->rd_ino)
             {
                 fs_t *fs = (dir)->vn_fs;
-                *out = vget(fs, entry->rd_ino);
+                *out = vget(fs, entry->rd_ino); // Get the vnode
             }
             else
             {
-                vref(dir);
+                vref(dir); // Increment the reference
                 *out = dir;
             }
             return 0;

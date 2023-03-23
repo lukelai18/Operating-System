@@ -200,7 +200,7 @@ proc_t *proc_create(const char *name)
     
     list_link_init(&new_proc->p_child_link); // Initialize two list link
     list_link_init(&new_proc->p_list_link);
-    list_insert_tail(&proc_list,&new_proc->p_list_link); //  Insert the new_proc into the proc_list
+    list_insert_tail(&proc_list,&new_proc->p_list_link); // Insert the new_proc into the proc_list
     list_insert_tail(&curproc->p_children,&new_proc->p_child_link); // Insert it into parents' children list
 
     spinlock_init(&new_proc->p_children_lock); // Initialize spin lock
@@ -211,6 +211,9 @@ proc_t *proc_create(const char *name)
     if(new_proc->p_pid==PID_INIT){ // If the new proc is the init process
         proc_initproc=new_proc;
     }
+
+    memset(new_proc->p_files, 0, sizeof(new_proc->p_files)); // Initialize VFS part
+    new_proc->p_cwd=NULL;
     // NOT_YET_IMPLEMENTED("PROCS: proc_create");
     return new_proc;
 }
@@ -284,7 +287,7 @@ void proc_kill(proc_t *proc, long status)
     if(proc!=curproc) { // Make sure that it is not current process
     proc->p_status=status; // Set the status of the process
       list_iterate(&proc->p_threads,p_thr,kthread_t,kt_plink){ // Iterate the process's thread list
-              kthread_cancel(p_thr,(void *)status); // Cancel all the thread
+            kthread_cancel(p_thr,(void *)status); // Cancel all the thread
       }            // TODO: Not sure if kthread_cancel is correct
     }
     // NOT_YET_IMPLEMENTED("PROCS: proc_kill");
@@ -303,7 +306,7 @@ void proc_kill_all()
 {
     list_iterate(&proc_list,iter_proc,proc_t,p_list_link){ // Loop the list of all processes
            if(iter_proc->p_pproc!=&idleproc){ // If it's parents is not idleproc
-                 proc_kill(iter_proc,-1); // Cancel the process
+                proc_kill(iter_proc,-1); // Cancel the process
            }
     }
     do_exit(-1); // Kill the current process
@@ -439,7 +442,7 @@ pid_t do_waitpid(pid_t pid, int *status, int options)
  */
 void do_exit(long status)
 {
-    kthread_exit(&status); // TODO: Finish it later
+    kthread_exit(&status); 
     // NOT_YET_IMPLEMENTED("PROCS: do_exit");
 }
 

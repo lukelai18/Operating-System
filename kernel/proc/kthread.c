@@ -144,9 +144,9 @@ void kthread_destroy(kthread_t *thr)
 void kthread_cancel(kthread_t *thr, void *retval)
 {
     if(thr!=curthr){ // Make sure it is not current thread
-    thr->kt_retval=retval; // Set the return value
-    thr->kt_cancelled=1;
-    sched_cancel(thr);
+        thr->kt_retval=retval; // Set the return value
+        thr->kt_cancelled=1;
+        sched_cancel(thr);
     }
     // NOT_YET_IMPLEMENTED("PROCS: kthread_cancel");
 }

@@ -188,7 +188,7 @@ void sched_cancel(kthread_t *thr)
     if(thr->kt_state==KT_SLEEP_CANCELLABLE){
       // We do not need to use spinlock unless we do SMP
       ktqueue_remove(thr->kt_wchan,thr);  // Remove it from the queue
-      thr->kt_state=KT_RUNNABLE;
+      sched_make_runnable(thr); // Make the thread runable and put it into runq, so that it can be cleaned up
     }
     //NOT_YET_IMPLEMENTED("PROCS: sched_cancel");
 }
@@ -261,9 +261,9 @@ void sched_make_runnable(kthread_t *thr)
 {
     uint8_t tmp=intr_setipl(IPL_HIGH); // Set interrupt priority
     if(thr!=curthr){
-    thr->kt_state=KT_RUNNABLE; // Set the thread state
-    ktqueue_enqueue(&kt_runq, thr);
-    intr_setipl(tmp);
+        thr->kt_state=KT_RUNNABLE; // Set the thread state
+        ktqueue_enqueue(&kt_runq, thr);
+        intr_setipl(tmp);
     }
     // NOT_YET_IMPLEMENTED("PROCS: sched_make_runnable");
 }
@@ -384,7 +384,7 @@ void core_switch()
         KASSERT(!intr_enabled());
         KASSERT(!curthr || curthr->kt_state != KT_ON_CPU);
 
-        if (curcore.kc_queue)  
+        if (curcore.kc_queue)  // If kc_queue is not empry
         {
             ktqueue_enqueue(curcore.kc_queue, curthr);
             spinlock_unlock(&curcore.kc_queue->tq_lock);

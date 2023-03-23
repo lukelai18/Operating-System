@@ -120,8 +120,18 @@ void pipe_init(void)
  */
 static pipe_t *pipe_create(void)
 {
+    pipe_t *pip=slab_obj_alloc(pipe_allocator);
+    pip->pv_buf[PIPE_BUF_SIZE];
+    pip->pv_head=0;
+    pip->pv_size=0;
+    pip->pv_readers=0;
+    pip->pv_writers=0;
+    kmutex_init(&pip->pv_rdlock); // Init the two locks
+    kmutex_init(&pip->pv_wrlock);
+    sched_queue_init(&pip->pv_read_waitq); // Init the two queues
+    sched_queue_init(&pip->pv_write_waitq);
     NOT_YET_IMPLEMENTED("PIPES: pipe_create");
-    return NULL;
+    return pip;
 }
 
 /*

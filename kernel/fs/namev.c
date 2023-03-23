@@ -28,7 +28,7 @@ long namev_get_parent(vnode_t *dir, vnode_t **out)
  */
 long namev_is_descendant(vnode_t *a, vnode_t *b)
 {
-    vref(a);
+    vref(a); // Increase the reference count
     vnode_t *cur = a;
     vnode_t *next = NULL;
     while (cur != NULL)
@@ -49,7 +49,7 @@ long namev_is_descendant(vnode_t *a, vnode_t *b)
         namev_get_parent(cur, &next);
         vnode_t *tmp = cur;
         cur = next;
-        vput(&tmp);
+        vput(&tmp); // Decrement the reference count of tmp
     }
 
     return 0;
@@ -76,8 +76,9 @@ long namev_is_descendant(vnode_t *a, vnode_t *b)
 long namev_lookup(vnode_t *dir, const char *name, size_t namelen,
                   vnode_t **res_vnode)
 {
-    NOT_YET_IMPLEMENTED("VFS: namev_lookup");
-    return 0;
+    long tmp=dir->vn_ops->lookup(dir,name,namelen,res_vnode);
+    // NOT_YET_IMPLEMENTED("VFS: namev_lookup");
+    return tmp;
 }
 
 /*
@@ -114,7 +115,7 @@ static const char *namev_tokenize(const char **search, size_t *len)
     if (*search == NULL)
     {
         *len = 0;
-        return NULL;
+        return NULL;    
     }
 
     KASSERT(NULL != *search);
@@ -122,12 +123,12 @@ static const char *namev_tokenize(const char **search, size_t *len)
     /* Skip initial '/' to find the beginning of the token. */
     while (**search == '/')
     {
-        (*search)++;
+        (*search)++; // If the first element is '/', skip it
     }
 
     /* Determine the length of the token by searching for either the
      *  next '/' or the end of the path. */
-    begin = *search;
+    begin = *search;    
     *len = 0;
     while (**search && **search != '/')
     {
@@ -187,8 +188,30 @@ static const char *namev_tokenize(const char **search, size_t *len)
 long namev_dir(vnode_t *base, const char *path, vnode_t **res_vnode,
                const char **name, size_t *namelen)
 {
-    NOT_YET_IMPLEMENTED("VFS: namev_dir");
-    return 0;
+    if(path==NULL){ // If path refers to an empty string 
+        return -EINVAL;
+    }
+    long tmp;
+
+    while(name!=NULL){
+        // Namelen reprensents the length of the directory, then name will point to the next directory
+        // path will remain point to the previous directory 
+        path=namev_tokenize(name,namelen); 
+        vlock(base);
+        vref(base); // Increase the reference
+        vref(*res_vnode);
+        tmp=namev_lookup(base,path,&namelen,res_vnode); // Find the vnode of previous directory
+        if(name!=NULL){ // If the name is not NULL, decrease the reference of vnode
+            vput(base);
+            vput(*res_vnode);
+        }
+        vunlock(base);
+    }
+    *name=path; // Update the name to the basename
+    *namelen=strlen(*name);
+    namev_get_parent(base,res_vnode); // Update the res_vnode to its parents
+    // NOT_YET_IMPLEMENTED("VFS: namev_dir");
+    return tmp;
 }
 
 /*
@@ -197,7 +220,7 @@ long namev_dir(vnode_t *base, const char *path, vnode_t **res_vnode,
  *  and with an added reference.
  *
  * Return 0 on success, or:
- *  - EINVAL: O_CREAT is specified but path implies a directory
+ *  - EINVAL: O_CREAT is specified but path implies a directory, which means that it ends with a slash
  *  - ENAMETOOLONG: path basename is too long
  *  - ENOTDIR: Attempting to open a regular file as a directory
  *  - Propagate errors from namev_dir() and namev_lookup()
@@ -217,7 +240,16 @@ long namev_dir(vnode_t *base, const char *path, vnode_t **res_vnode,
 long namev_open(vnode_t *base, const char *path, int oflags, int mode,
                 devid_t devid, struct vnode **res_vnode)
 {
-    NOT_YET_IMPLEMENTED("VFS: namev_open");
+    const char **name=&path;
+    size_t *namelen=NULL;
+    long tmp=namev_dir(base,path,res_vnode,name,namelen);
+    if(tmp<0){
+        return tmp;
+    }
+    if(oflags==O_CREAT ){
+
+    }
+    // NOT_YET_IMPLEMENTED("VFS: namev_open");
     return 0;
 }
 

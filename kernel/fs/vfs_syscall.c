@@ -26,8 +26,17 @@
  */
 ssize_t do_read(int fd, void *buf, size_t len)
 {
-    NOT_YET_IMPLEMENTED("VFS: do_read");
-    return -1;
+    if(fd<0 || fd>=NFILES || curproc->p_files[fd]->f_mode!=FMODE_READ){ // If fd is invalid or it's not open for reading
+        return -EBADF;
+    }
+    // TODO: EISDIR: fd refers to a directory
+    vlock(curproc->p_files[fd]->f_vnode);
+    // TODO: How can we update position appropriately
+    ssize_t tmp=curproc->p_files[fd]->f_vnode->vn_ops->read(curproc->p_files[fd]->f_vnode,
+    curproc->p_files[fd]->f_pos,buf,len);
+    vunlock(curproc->p_files[fd]->f_vnode);
+    // NOT_YET_IMPLEMENTED("VFS: do_read");
+    return tmp;
 }
 
 /*
@@ -46,6 +55,7 @@ ssize_t do_read(int fd, void *buf, size_t len)
  */
 ssize_t do_write(int fd, const void *buf, size_t len)
 {
+    
     NOT_YET_IMPLEMENTED("VFS: do_write");
     return -1;
 }

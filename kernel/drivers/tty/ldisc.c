@@ -46,6 +46,9 @@ long ldisc_wait_read(ldisc_t *ldisc, spinlock_t *lock)
     // When the tail is equal to cooked and it is not full, which means that there are no cooked characters
     while(ldisc->ldisc_tail ==ldisc->ldisc_cooked && (!ldisc->ldisc_full)){      
       ret=sched_cancellable_sleep_on(&ldisc->ldisc_read_queue,lock); // Put current thread into sleep
+      if(ret<0){  // If we face an error condition
+        return ret;
+      }
     }   
     // NOT_YET_IMPLEMENTED("DRIVERS: ldisc_wait_read");
     return ret;
