@@ -62,6 +62,32 @@ long get_empty_fd(int *fd)
  */
 long do_open(const char *filename, int oflags)
 {
-    NOT_YET_IMPLEMENTED("VFS: do_open");
-    return -1;
+    // TODO: To be completed
+    if((!(oflags&O_RDONLY))&&!(oflags&O_WRONLY)&&!(oflags&O_APPEND)&&!(oflags&O_RDWR)&&!(oflags&O_TRUNC)
+    &&!(oflags&O_CREAT)){ // If it is not valid flag
+        return -EINVAL;
+    }
+    if(oflags&(O_WRONLY|O_RDWR))    {return -EINVAL;} // If both write only and read-write are specified
+    int fd=0;
+    long tmp1=get_empty_fd(&fd); // Get available fd
+    if(tmp1<0)  {return tmp1;} // Error check
+    vnode_t *res_vnode;
+    long tmp2=namev_open(curproc->p_cwd,filename,oflags,S_IFREG,0,&res_vnode);
+    if(tmp2<0)  {return tmp2;} // Error check
+    // Trying to open a directory with write access
+    if((oflags==O_WRONLY||oflags==O_RDWR)&&S_ISDIR((*res_vnode).vn_mode)){ return -EISDIR; }
+    if((S_ISCHR(res_vnode->vn_mode)&&res_vnode->vn_dev.chardev==NULL)  // If does not have an actual underlying device
+    ||(S_ISBLK(res_vnode->vn_mode)&&res_vnode->vn_dev.blockdev==NULL)){
+        return -ENXIO;
+    }
+    unsigned int mode=0; 
+    // Convert oflags into file access flags
+    if((oflags&O_WRONLY))   {mode=(mode|FMODE_WRITE);}
+    else if((oflags&O_RDWR))     {mode=(mode|FMODE_READ|FMODE_WRITE);}
+    else    {mode=(mode|FMODE_READ);}
+    if((oflags&O_APPEND))   {mode=(mode|FMODE_APPEND);}
+    file_t *f1=fcreate(fd,res_vnode,mode); // Create file descriptor
+    if(!(curproc->p_files[fd]==f1 && f1->f_refcount==1))    {return -ENOMEM;} // If fcreate fails
+    // NOT_YET_IMPLEMENTED("VFS: do_open");
+    return 0;
 }

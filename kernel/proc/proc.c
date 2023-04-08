@@ -239,14 +239,21 @@ void proc_cleanup(long status)
 {
     curproc->p_state=PROC_DEAD;
     curproc->p_status=status;         // Set current process's state and status
+    for(int i=0;i<NFILES;i++){
+        do_close(i);                // Clean up all the files
+    }
+    if(curproc->p_cwd){
+        vput(&curproc->p_cwd);
+    }
     if(curproc->p_pid==PID_INIT){  // If the current process is initial process
        initproc_finish(); // Shup down the weenix
     }
     else{
         list_iterate(&curproc->p_children,p_child,proc_t,p_child_link){ // Loop the child list
-               list_insert_tail(&proc_initproc->p_children,&curproc->p_child_link); // Add the children into 
-                                                                                   // initial process's list                                                                                  
-               list_remove(&curproc->p_child_link); // Remove children in current process's children link
+            list_remove(&p_child->p_child_link); // Remove children in current process's children link
+            p_child->p_pproc=proc_initproc;
+            list_insert_tail(&proc_initproc->p_children,&(p_child->p_child_link)); // Add the children into 
+                                                                                 // initial process's list                                                                                  
         }
     }
     // NOT_YET_IMPLEMENTED("PROCS: proc_cleanup");

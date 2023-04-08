@@ -44,6 +44,7 @@ GDB_DEFINE_HOOK(initialized)
 GDB_DEFINE_HOOK(shutdown)
 
 static void initproc_start();
+int vfstest_main(int argc, char **argv);
 
 typedef void (*init_func_t)();
 static init_func_t init_funcs[] = {
@@ -82,6 +83,7 @@ static init_func_t init_funcs[] = {
     proc_idleproc_init,
 };
 
+
 /*
  * Call the init functions (in order!), then run the init process
  * (initproc_start)
@@ -113,7 +115,7 @@ static void make_devices()
     KASSERT(!status || status == -EEXIST);
     status = do_mknod("/dev/zero", S_IFCHR, MEM_ZERO_DEVID);
     KASSERT(!status || status == -EEXIST);
-
+    
     char path[32] = {0};
     for (long i = 0; i < __NTERMS__; i++)
     {
@@ -164,6 +166,7 @@ static void *initproc_run(long arg1, void *arg2)
     vfs_init();
     make_devices();
 #endif
+    vfstest_main(1,arg2);
 /* To create a kshell on each terminal */
 #ifdef __DRIVERS__
     char name[32] = {0};

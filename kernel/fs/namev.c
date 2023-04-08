@@ -35,7 +35,7 @@ long namev_is_descendant(vnode_t *a, vnode_t *b)
     {
         if (cur->vn_vno == b->vn_vno)
         {
-            vput(&cur);
+            vput(&cur); // Decrease the reference
             return 1;
         }
         else if (cur->vn_vno == cur->vn_fs->fs_root->vn_vno)
@@ -76,6 +76,9 @@ long namev_is_descendant(vnode_t *a, vnode_t *b)
 long namev_lookup(vnode_t *dir, const char *name, size_t namelen,
                   vnode_t **res_vnode)
 {
+    if(!S_ISDIR(dir->vn_mode)){  // If dir is not a directory
+        return -ENOTDIR;
+    }
     long tmp=dir->vn_ops->lookup(dir,name,namelen,res_vnode);
     // NOT_YET_IMPLEMENTED("VFS: namev_lookup");
     return tmp;
@@ -112,7 +115,7 @@ static const char *namev_tokenize(const char **search, size_t *len)
 {
     const char *begin;
 
-    if (*search == NULL)
+    if (*search == NULL)  // If the search point to a NULL string
     {
         *len = 0;
         return NULL;    
@@ -123,22 +126,22 @@ static const char *namev_tokenize(const char **search, size_t *len)
     /* Skip initial '/' to find the beginning of the token. */
     while (**search == '/')
     {
-        (*search)++; // If the first element is '/', skip it
+        (*search)++; // If the first element is '/' or there are consecutive '/', skip it
     }
 
     /* Determine the length of the token by searching for either the
      *  next '/' or the end of the path. */
-    begin = *search;    
-    *len = 0;
-    while (**search && **search != '/')
+    begin = *search;    // Set the begin, which is the first valid character
+    *len = 0;           
+    while (**search && **search != '/')  // If search is a valid character and didn't meet next '/'
     {
         (*len)++;
-        (*search)++;
+        (*search)++;  
     }
 
-    if (!**search)
+    if (!**search)         // If search point to a null character
     {
-        *search = NULL;
+        *search = NULL;    
     }
 
     return begin;
@@ -191,26 +194,36 @@ long namev_dir(vnode_t *base, const char *path, vnode_t **res_vnode,
     if(path==NULL){ // If path refers to an empty string 
         return -EINVAL;
     }
-    long tmp;
-
-    while(name!=NULL){
-        // Namelen reprensents the length of the directory, then name will point to the next directory
-        // path will remain point to the previous directory 
-        path=namev_tokenize(name,namelen); 
-        vlock(base);
-        vref(base); // Increase the reference
-        vref(*res_vnode);
-        tmp=namev_lookup(base,path,&namelen,res_vnode); // Find the vnode of previous directory
-        if(name!=NULL){ // If the name is not NULL, decrease the reference of vnode
-            vput(base);
-            vput(*res_vnode);
-        }
-        vunlock(base);
+    if(path[0]=='/'){ // If path start with a /, set the base as root node
+        base=vfs_root_fs.fs_root;
     }
-    *name=path; // Update the name to the basename
-    *namelen=strlen(*name);
-    namev_get_parent(base,res_vnode); // Update the res_vnode to its parents
-    // NOT_YET_IMPLEMENTED("VFS: namev_dir");
+    vref(base); 
+    long tmp=0;
+    const char *cur_token;  // Store the current token and next token
+    const char *next_token;
+    size_t cur_namelen=0;
+    size_t next_namelen=0;
+    cur_token=namev_tokenize(name,namelen);  // Tokenize and get the first token
+    cur_namelen=*namelen;
+    (*res_vnode)=base;
+    // If the second token is "/" or "", they will return NULL, next_namelen will be 0
+    // And it won't enter the while loop
+    next_token=namev_tokenize(name,namelen); // Tokenize and get the second token
+    next_namelen=*namelen;
+    while(next_namelen!=0){ // Which means that the next_token is "/" or ""
+        vlock(base);  // Lock if we use vnode operation
+        tmp=namev_lookup(base,cur_token,cur_namelen,res_vnode); // Find the vnode of current token 
+        vunlock(base);      
+        vput(&base);    
+        if(tmp<0)   {return tmp;}
+        base=*res_vnode; // Set base as the founded vnode
+        cur_token=next_token;   // Update the current token and next token
+        cur_namelen=next_namelen;
+        next_token=namev_tokenize(name,namelen); // Tokenize and updte next_token
+        next_namelen=*namelen;
+    }
+    *name=cur_token;
+    *namelen=cur_namelen;
     return tmp;
 }
 
@@ -240,16 +253,37 @@ long namev_dir(vnode_t *base, const char *path, vnode_t **res_vnode,
 long namev_open(vnode_t *base, const char *path, int oflags, int mode,
                 devid_t devid, struct vnode **res_vnode)
 {
-    const char **name=&path;
-    size_t *namelen=NULL;
-    long tmp=namev_dir(base,path,res_vnode,name,namelen);
-    if(tmp<0){
-        return tmp;
+    size_t length=strlen(path);
+    if(path[length-1]=='/' && (oflags&O_CREAT))     {return -EINVAL;}
+    const char *name=path; // Initialize name and namelen
+    size_t namelen=0;
+    long tmp=namev_dir(base,path,res_vnode,&name,&namelen);
+    vnode_t *parent_vnode=*res_vnode;
+    if(tmp<0)   {return tmp;} // If there is error returned by namev_dir
+    if(namelen>NAME_LEN){     
+        return -ENAMETOOLONG;
     }
-    if(oflags==O_CREAT ){
-
+    vref(parent_vnode);
+    vlock(parent_vnode);
+    long tmp2=namev_lookup(parent_vnode,name,namelen,res_vnode); // Obtain the desired vnode and increment the reference
+    vunlock(parent_vnode);
+    //if(oflags==O_CREAT && S_ISDIR((*res_vnode)->vn_mode)){ // O_CREAT is specified but path implies a directory
+    //    return -EINVAL;
+    //}
+    if(tmp2<0 && (oflags&O_CREAT)){ // If namev_lookup() fails and O_CREAT is specified in oflags
+        // If it failed, the res_vnode won't change, it is still the parents vnode
+        parent_vnode->vn_ops->mknod(parent_vnode,name,namelen,mode,devid,res_vnode); // Will add ref for vnode
+        vput(&parent_vnode);
     }
-    // NOT_YET_IMPLEMENTED("VFS: namev_open");
+    else if(tmp2<0)  { // If there exsit other issues
+        vput(&parent_vnode);
+        return tmp2;
+    }   
+    // The res_vnode is the directory we would like to open  
+    if(!S_ISDIR((*res_vnode)->vn_mode) && path[length-1]=='/'){
+        return -ENOTDIR; // If attempting to open a regular file as a directory
+    }
+    // NOT_YET_IMPLEMENTED("VFS: namev_open"); 
     return 0;
 }
 
