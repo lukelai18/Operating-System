@@ -75,9 +75,13 @@ long do_open(const char *filename, int oflags)
     long tmp2=namev_open(curproc->p_cwd,filename,oflags,S_IFREG,0,&res_vnode);
     if(tmp2<0)  {return tmp2;} // Error check
     // Trying to open a directory with write access
-    if((oflags==O_WRONLY||oflags==O_RDWR)&&S_ISDIR((*res_vnode).vn_mode)){ return -EISDIR; }
+    if((oflags==O_WRONLY||oflags==O_RDWR)&&S_ISDIR((*res_vnode).vn_mode)){ 
+        vput(&res_vnode);
+        return -EISDIR; 
+    }
     if((S_ISCHR(res_vnode->vn_mode)&&res_vnode->vn_dev.chardev==NULL)  // If does not have an actual underlying device
     ||(S_ISBLK(res_vnode->vn_mode)&&res_vnode->vn_dev.blockdev==NULL)){
+        vput(&res_vnode);
         return -ENXIO;
     }
     unsigned int mode=0; 
@@ -87,6 +91,7 @@ long do_open(const char *filename, int oflags)
     else    {mode=(mode|FMODE_READ);}
     if((oflags&O_APPEND))   {mode=(mode|FMODE_APPEND);}
     file_t *f1=fcreate(fd,res_vnode,mode); // Create file descriptor
+    vput(&res_vnode);
     if(!(curproc->p_files[fd]==f1 && f1->f_refcount==1))    {return -ENOMEM;} // If fcreate fails
     // NOT_YET_IMPLEMENTED("VFS: do_open");
     return 0;

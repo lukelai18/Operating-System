@@ -215,7 +215,7 @@ long namev_dir(vnode_t *base, const char *path, vnode_t **res_vnode,
         tmp=namev_lookup(base,cur_token,cur_namelen,res_vnode); // Find the vnode of current token 
         vunlock(base);      
         vput(&base);    
-        if(tmp<0)   {return tmp;}
+        if(tmp<0)   {  return tmp;}
         base=*res_vnode; // Set base as the founded vnode
         cur_token=next_token;   // Update the current token and next token
         cur_namelen=next_namelen;
@@ -224,7 +224,7 @@ long namev_dir(vnode_t *base, const char *path, vnode_t **res_vnode,
     }
     *name=cur_token;
     *namelen=cur_namelen;
-    return tmp;
+    return 0;
 }
 
 /*
@@ -258,18 +258,16 @@ long namev_open(vnode_t *base, const char *path, int oflags, int mode,
     const char *name=path; // Initialize name and namelen
     size_t namelen=0;
     long tmp=namev_dir(base,path,res_vnode,&name,&namelen);
-    vnode_t *parent_vnode=*res_vnode;
+    vnode_t *parent_vnode=*res_vnode; // Get the parent vnode of the basename
     if(tmp<0)   {return tmp;} // If there is error returned by namev_dir
-    if(namelen>NAME_LEN){     
+    if(namelen>NAME_LEN){  
+        vput(res_vnode);   
         return -ENAMETOOLONG;
     }
-    vref(parent_vnode);
     vlock(parent_vnode);
     long tmp2=namev_lookup(parent_vnode,name,namelen,res_vnode); // Obtain the desired vnode and increment the reference
     vunlock(parent_vnode);
-    //if(oflags==O_CREAT && S_ISDIR((*res_vnode)->vn_mode)){ // O_CREAT is specified but path implies a directory
-    //    return -EINVAL;
-    //}
+    // If lookup succeed, now the res_vnode is the directory we would like to open  
     if(tmp2<0 && (oflags&O_CREAT)){ // If namev_lookup() fails and O_CREAT is specified in oflags
         // If it failed, the res_vnode won't change, it is still the parents vnode
         parent_vnode->vn_ops->mknod(parent_vnode,name,namelen,mode,devid,res_vnode); // Will add ref for vnode
@@ -279,8 +277,8 @@ long namev_open(vnode_t *base, const char *path, int oflags, int mode,
         vput(&parent_vnode);
         return tmp2;
     }   
-    // The res_vnode is the directory we would like to open  
     if(!S_ISDIR((*res_vnode)->vn_mode) && path[length-1]=='/'){
+        vput(res_vnode);
         return -ENOTDIR; // If attempting to open a regular file as a directory
     }
     // NOT_YET_IMPLEMENTED("VFS: namev_open"); 
