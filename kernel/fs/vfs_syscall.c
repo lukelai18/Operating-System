@@ -26,19 +26,19 @@
  */
 ssize_t do_read(int fd, void *buf, size_t len)
 {
-    if(fd<0 || fd>=NFILES || !(curproc->p_files[fd]->f_mode&FMODE_READ)){ // If fd is invalid or it's not open for reading
+    if(fd<0 || fd>=NFILES || curproc->p_files[fd]==NULL|| !(curproc->p_files[fd]->f_mode&FMODE_READ)){ // If fd is invalid or it's not open for reading
         return -EBADF;
     }
     if(S_ISDIR(curproc->p_files[fd]->f_vnode->vn_mode)){ // EISDIR: fd refers to a directory
         return -EISDIR;
     }
     vlock(curproc->p_files[fd]->f_vnode);
-    vref(curproc->p_files[fd]->f_vnode);
+    file_t *tmp_file= fget(fd);
     ssize_t tmp=curproc->p_files[fd]->f_vnode->vn_ops->read(curproc->p_files[fd]->f_vnode,
     curproc->p_files[fd]->f_pos,buf,len);
-    curproc->p_files[fd]->f_pos=tmp; // Update position
+    curproc->p_files[fd]->f_pos+=tmp; // Update position
     vunlock(curproc->p_files[fd]->f_vnode);
-    vput(&curproc->p_files[fd]->f_vnode);
+    fput(&tmp_file);
     // NOT_YET_IMPLEMENTED("VFS: do_read");
     return tmp;
 }
@@ -59,7 +59,7 @@ ssize_t do_read(int fd, void *buf, size_t len)
  */
 ssize_t do_write(int fd, const void *buf, size_t len)
 {
-    if(fd<0 || fd>=NFILES || !(curproc->p_files[fd]->f_mode&FMODE_WRITE)){ // If fd is invalid or it's not open for reading
+    if(fd<0 || fd>=NFILES || curproc->p_files[fd]==NULL || !(curproc->p_files[fd]->f_mode&FMODE_WRITE)){ // If fd is invalid or it's not open for reading
         return -EBADF;
     }
     if((curproc->p_files[fd]->f_mode&FMODE_APPEND)){
@@ -67,11 +67,12 @@ ssize_t do_write(int fd, const void *buf, size_t len)
         // Set the position to the end of file, which should be the current size of vnode
     }
     vlock(curproc->p_files[fd]->f_vnode);
-    vref(curproc->p_files[fd]->f_vnode);
+    file_t *tmp_file= fget(fd);
     ssize_t tmp=curproc->p_files[fd]->f_vnode->vn_ops->write(curproc->p_files[fd]->f_vnode,
     curproc->p_files[fd]->f_pos,buf,len);
+    curproc->p_files[fd]->f_pos+=tmp; // Update position
     vunlock(curproc->p_files[fd]->f_vnode);
-    vput(&curproc->p_files[fd]->f_vnode);
+    fput(&tmp_file);
     // NOT_YET_IMPLEMENTED("VFS: do_write");
     return tmp;
 }
@@ -114,9 +115,12 @@ long do_dup(int fd)
     if(fd<0 || fd>=NFILES || curproc->p_files[fd]==NULL){ // If fd is invalid or it's not open
         return -EBADF;
     }
-    long new_fd=get_empty_fd(&fd);
+    int old_fd=fd;
+    long if_success=get_empty_fd(&fd);
+    if(if_success<0)    {return if_success;}
+    curproc->p_files[fd]=curproc->p_files[old_fd];
     // NOT_YET_IMPLEMENTED("VFS: do_dup");
-    return new_fd;
+    return fd;
 }
 
 /*
@@ -139,7 +143,7 @@ long do_dup2(int ofd, int nfd)
         if(curproc->p_files[nfd]!=NULL){
             do_close(nfd); // If nfd was previously open, close it
         }
-        nfd=get_empty_fd(&ofd);
+        curproc->p_files[nfd]=curproc->p_files[ofd];
     }
     // NOT_YET_IMPLEMENTED("VFS: do_dup2");
     return nfd;
@@ -264,18 +268,17 @@ long do_rmdir(const char *path)
         return -EINVAL;
     }
     const char *two_dots="..";
-    if(strncmp(*name,two_dots,namelen)&&namelen==2)  {
+    if(strcmp(*name,two_dots)==0 &&namelen==2)  { // If name is equal to ".." and the namelen is 2
         vput(&res_vnode);
         return -ENOTEMPTY;
     }
     vlock(res_vnode);
-    // vref(res_vnode);
     long tmp2=res_vnode->vn_ops->rmdir(res_vnode,*name,namelen); // Use remove directory
     vunlock(res_vnode);
     vput(&res_vnode);
     // TODO: Check the refcounts
     // NOT_YET_IMPLEMENTED("VFS: do_rmdir");
-    return 0;
+    return tmp2;
 }
 
 /*
@@ -316,10 +319,12 @@ long do_unlink(const char *path)
         vput(&res_vnode2);
         return -EPERM;
     }
-    vlock(res_vnode2);
-    long tmp3=res_vnode2->vn_ops->unlink(res_vnode2,*name,namelen);
-    vunlock(res_vnode2);
+    vlock(res_vnode);
+    long tmp3=res_vnode->vn_ops->unlink(res_vnode,*name,namelen);
+    // TODO: Check it later
+    vunlock(res_vnode);
     vput(&res_vnode2);
+    vput(&res_vnode);
     // NOT_YET_IMPLEMENTED("VFS: do_unlink");
     return 0;
 }
@@ -426,6 +431,16 @@ long do_rename(const char *oldpath, const char *newpath)
         vput(&oldres_vnode);
         return tmp2;
     }
+    if(!S_ISDIR(oldres_vnode->vn_mode)||!S_ISDIR(newres_vnode->vn_mode)){
+        vput(&oldres_vnode);
+        vput(&newres_vnode);
+        return -ENOTDIR; // If the parent of either path is not a directory
+    }
+    if(oldnamelen>NAME_LEN||newnamelen>NAME_LEN){ // If the last component of either path is too long
+        vput(&oldres_vnode);
+        vput(&newres_vnode);
+        return -ENAMETOOLONG;
+    }
     vlock_in_order(oldres_vnode,newres_vnode); // Lock the two vnodes
     long tmp3=oldres_vnode->vn_ops->rename(oldres_vnode,*oldname,oldnamelen,newres_vnode,*newname,newnamelen);
     vunlock_in_order(oldres_vnode,newres_vnode);
@@ -457,9 +472,9 @@ long do_chdir(const char *path)
         vput(&res_vnode);
         return -ENOTDIR;
     } // If path does not refer to a directory
-    vlock(res_vnode);
+    vput(&curproc->p_cwd);
     curproc->p_cwd=res_vnode; // Set it to the directory represented by path
-    vunlock(res_vnode);
+    vref(curproc->p_cwd);
     // TODO: In this situation, should we decresase the ref count of res_vnode, because we set it as
     // current work directory and we may use it
     // NOT_YET_IMPLEMENTED("VFS: do_chdir");
@@ -488,13 +503,13 @@ ssize_t do_getdent(int fd, struct dirent *dirp)
     if(!S_ISDIR(curproc->p_files[fd]->f_vnode->vn_mode)){
         return -ENOTDIR;
     }
-    fref(curproc->p_files[fd]);
+    file_t *tmp_file=fget(fd);
     ssize_t tmp=curproc->p_files[fd]->f_vnode->vn_ops->readdir(curproc->p_files[fd]->f_vnode,curproc->p_files[fd]->f_pos,dirp);
-    curproc->p_files[fd]->f_pos=tmp; // Update file position
-    fput(&curproc->p_files[fd]);
+    curproc->p_files[fd]->f_pos+=tmp; // Update file position
+    fput(&tmp_file);
     //NOT_YET_IMPLEMENTED("VFS: do_getdent");
     if(tmp>0) { 
-        return sizeof(dirp);
+        return sizeof(dirp)+tmp;
     } else  {   
         return -1;  
     }
@@ -520,23 +535,27 @@ off_t do_lseek(int fd, off_t offset, int whence)
     if(fd<0 || fd>=NFILES || curproc->p_files[fd]==NULL){
         return -EBADF;
     }
-    if(whence!=SEEK_SET||whence!=SEEK_CUR||whence!=SEEK_END||offset<0){
+    if(whence!=SEEK_SET&&whence!=SEEK_CUR&&whence!=SEEK_END){
         return -EINVAL;
     }
 
-    vlock(curproc->p_files[fd]->f_vnode);  // Protect the vnode
+    // vlock(curproc->p_files[fd]->f_vnode);  // Protect the vnode
+    // file_t *tmp_file=fget(fd);
     if(whence==SEEK_SET){
-        curproc->p_files[fd]->f_pos=offset;
+        offset=offset;
     } 
     else if(whence==SEEK_CUR){
-        curproc->p_files[fd]->f_pos=curproc->p_files[fd]->f_pos+offset;
+        offset=curproc->p_files[fd]->f_pos+offset;
     }
     else if(whence==SEEK_END){
-        curproc->p_files[fd]->f_pos=offset+sizeof(curproc->p_files[fd]);
+        offset=offset+sizeof(curproc->p_files[fd]); // TODO: Maybe the size of p_files[fd] can be represented by f_vnode->vn_len
     }
-    vunlock(curproc->p_files[fd]->f_vnode);
+    // vunlock(curproc->p_files[fd]->f_vnode);
+    // fput(&tmp_file);
+    if(offset<0)   {return -EINVAL;} // If the resulting offset is negative
+    curproc->p_files[fd]->f_pos=offset;
     // NOT_YET_IMPLEMENTED("VFS: do_lseek");
-    return 0;
+    return offset;
 }
 
 /* Use buf to return the status of the file represented by path.

@@ -191,7 +191,7 @@ static const char *namev_tokenize(const char **search, size_t *len)
 long namev_dir(vnode_t *base, const char *path, vnode_t **res_vnode,
                const char **name, size_t *namelen)
 {
-    if(path==NULL){ // If path refers to an empty string 
+    if(strlen(path)==0||path==NULL){ // If path refers to an empty string 
         return -EINVAL;
     }
     if(path[0]=='/'){ // If path start with a /, set the base as root node
@@ -268,8 +268,7 @@ long namev_open(vnode_t *base, const char *path, int oflags, int mode,
     long tmp2=namev_lookup(parent_vnode,name,namelen,res_vnode); // Obtain the desired vnode and increment the reference
     vunlock(parent_vnode);
     // If lookup succeed, now the res_vnode is the directory we would like to open  
-    if(tmp2<0 && (oflags&O_CREAT)){ // If namev_lookup() fails and O_CREAT is specified in oflags
-        // If it failed, the res_vnode won't change, it is still the parents vnode
+    if(tmp2!=-ENOTDIR&&tmp2<0 && (oflags&O_CREAT)){ // If namev_lookup() fails and O_CREAT is specified in oflags
         parent_vnode->vn_ops->mknod(parent_vnode,name,namelen,mode,devid,res_vnode); // Will add ref for vnode
         vput(&parent_vnode);
     }
