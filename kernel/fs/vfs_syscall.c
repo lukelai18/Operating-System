@@ -95,7 +95,7 @@ long do_close(int fd)
     }
     //curproc->p_files[fd]->f_refcount=0; // Set the reference count as 0
     if(curproc->p_files[fd]){
-        fput(curproc->p_files+fd);
+        fput(&curproc->p_files[fd]);
     }
     // NOT_YET_IMPLEMENTED("VFS: do_close");
     return 0;
