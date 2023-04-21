@@ -110,9 +110,8 @@ static long special_file_stat(vnode_t *file, stat_t *ss)
 static ssize_t chardev_file_read(vnode_t *file, size_t pos, void *buf,
                                  size_t count)
 {
-    init_special_vnode(file);
     vunlock(file);
-    ssize_t tmp=file->vn_ops->read(file,pos,buf,count);
+    ssize_t tmp=file->vn_dev.chardev->cd_ops->read(file->vn_dev.chardev, pos, buf, count);
     vlock(file);
     // NOT_YET_IMPLEMENTED("VFS: chardev_file_read");
     return tmp;
@@ -129,9 +128,8 @@ static ssize_t chardev_file_read(vnode_t *file, size_t pos, void *buf,
 static long chardev_file_write(vnode_t *file, size_t pos, const void *buf,
                                size_t count)
 {
-    init_special_vnode(file);
     vunlock(file);
-    ssize_t tmp=file->vn_ops->write(file,pos,buf,count);
+    ssize_t tmp=file->vn_dev.chardev->cd_ops->write(file->vn_dev.chardev, pos, buf, count);
     vlock(file);
     // NOT_YET_IMPLEMENTED("VFS: chardev_file_write");
     return tmp;

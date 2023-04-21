@@ -275,12 +275,18 @@ long namev_open(vnode_t *base, const char *path, int oflags, int mode,
     else if(tmp2<0)  { // If there exsit other issues
         vput(&parent_vnode);
         return tmp2;
-    }   
+    } else {
+        vput(&parent_vnode);
+    }
+    // TODO: ramfs_mknod()
+    //ssize_t tmp3=ramfs_mknod(parent_vnode,name,namelen,mode,devid,res_vnode);
+    //if(tmp3<0)  {return tmp3;}
     if(!S_ISDIR((*res_vnode)->vn_mode) && path[length-1]=='/'){
         vput(res_vnode);
         return -ENOTDIR; // If attempting to open a regular file as a directory
     }
     // NOT_YET_IMPLEMENTED("VFS: namev_open"); 
+
     return 0;
 }
 

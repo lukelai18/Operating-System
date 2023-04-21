@@ -399,6 +399,7 @@ static ssize_t ramfs_mknod(struct vnode *dir, const char *name, size_t name_len,
             break;
         }
     }
+    
 
     if (i == RAMFS_MAX_DIRENT)
     {

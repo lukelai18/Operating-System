@@ -79,8 +79,8 @@ long do_open(const char *filename, int oflags)
     }
     if((S_ISCHR(res_vnode->vn_mode)&&res_vnode->vn_dev.chardev==NULL)  // If does not have an actual underlying device
     ||(S_ISBLK(res_vnode->vn_mode)&&res_vnode->vn_dev.blockdev==NULL)){
-        vput(&res_vnode);
-        return -ENXIO;
+        vput(&res_vnode);   
+        return -ENXIO;      
     }
     unsigned int mode=0; 
     // Convert oflags into file access flags

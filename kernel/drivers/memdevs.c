@@ -43,10 +43,17 @@ chardev_ops_t zero_dev_ops = {.read = zero_read,
  */
 void memdevs_init()
 {
-    kmalloc(sizeof(chardev_t)); // Malloc a space for null
-    chardev_register(chardev_lookup(MEM_NULL_DEVID));
-    kmalloc(sizeof(chardev_t)); // Malloc a space for 0
-    chardev_register(chardev_lookup(MEM_ZERO_DEVID));
+    chardev_t* null_dev = kmalloc(sizeof(chardev_t)); // Malloc a space for null
+    null_dev->cd_id = MEM_NULL_DEVID;
+    null_dev->cd_ops = &null_dev_ops;
+    list_link_init(&null_dev->cd_link);
+    chardev_register(null_dev);
+
+    chardev_t* zero_dev=kmalloc(sizeof(chardev_t)); // Malloc a space for 0
+    zero_dev->cd_id=MEM_ZERO_DEVID;
+    zero_dev->cd_ops=&zero_dev_ops;
+    list_link_init(&zero_dev->cd_link);
+    chardev_register(zero_dev);
     // NOT_YET_IMPLEMENTED("DRIVERS: memdevs_init");
 }
 

@@ -199,6 +199,11 @@ long s5fs_mount(fs_t *fs)
  */
 static void s5fs_read_vnode(fs_t *fs, vnode_t *vn)
 {
+    s5_node_t *s5_inode=VNODE_TO_S5NODE(vn); // Get s5 node
+    s5fs_t* s5= FS_TO_S5FS(fs); // Get the s5fs object
+    blocknum_t b_num=S5_INODE_BLOCK(vn->vn_vno); // Block number containing the inode info
+    long in_offset=S5_INODE_OFFSET(b_num);
+    s5_get_disk_block(s5,b_num,in_offset,);
     NOT_YET_IMPLEMENTED("S5FS: s5fs_read_vnode");
 }
 

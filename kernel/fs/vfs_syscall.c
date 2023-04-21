@@ -119,6 +119,7 @@ long do_dup(int fd)
     long if_success=get_empty_fd(&fd);
     if(if_success<0)    {return if_success;}
     curproc->p_files[fd]=curproc->p_files[old_fd];
+    fref(curproc->p_files[fd]);
     // NOT_YET_IMPLEMENTED("VFS: do_dup");
     return fd;
 }
@@ -144,6 +145,7 @@ long do_dup2(int ofd, int nfd)
             do_close(nfd); // If nfd was previously open, close it
         }
         curproc->p_files[nfd]=curproc->p_files[ofd];
+        fref(curproc->p_files[nfd]);
     }
     // NOT_YET_IMPLEMENTED("VFS: do_dup2");
     return nfd;
@@ -206,17 +208,19 @@ long do_mkdir(const char *path)
     long tmp=namev_dir(curproc->p_cwd,path,&res_vnode,name,&namelen);
     if(tmp<0)   {  return tmp; }
     if(namelen>NAME_LEN){ // If the last component of the path is too long
+        vput(&res_vnode);
         return -ENAMETOOLONG;
     }
     if(!S_ISDIR(res_vnode->vn_mode)){ // If the parent of the directory to be created is not a directory
+        vput(&res_vnode);
         return -ENOTDIR;
     }
     vnode_t *res_vnode2; // The parent vnode of the directory to be created
-    vref(res_vnode);
     vlock(res_vnode);
     long tmp2=namev_lookup(res_vnode,*name,namelen,&res_vnode2); // Look up the vnode for the basename
     vunlock(res_vnode);
     if(tmp2==0){ // If a file already exist, we don't need to make directory
+        vput(&res_vnode);
         vput(&res_vnode2);  // Decrement the ref count of res_vnode2 added in namev_lookup
         return -EEXIST;
     }   
@@ -225,6 +229,10 @@ long do_mkdir(const char *path)
     long tmp3=res_vnode->vn_ops->mkdir(res_vnode,*name,namelen,&res_vnode3); // Create the directory
     vunlock(res_vnode);
     vput(&res_vnode); // We don't need to use res_vnode any more
+    if (tmp3 == 0) {
+        vput(&res_vnode3);
+    }
+    
     // if(tmp3<0)  { return tmp3; }
     // TODO: How to check out ramfs_mkdir()
     // NOT_YET_IMPLEMENTED("VFS: do_mkdir");
@@ -314,8 +322,12 @@ long do_unlink(const char *path)
     vlock(res_vnode);
     long tmp2=namev_lookup(res_vnode,*name,namelen,&res_vnode2); // Find the vnode we need to unlink
     vunlock(res_vnode);
-    if(tmp2<0)      { return tmp2; } // If we didn't find this vnode
+    if(tmp2<0)      {
+        vput(&res_vnode);
+         return tmp2; 
+    } // If we didn't find this vnode
     if(S_ISDIR(res_vnode2->vn_mode)) { // If the file to be unlinked is directory
+        vput(&res_vnode);
         vput(&res_vnode2);
         return -EPERM;
     }
@@ -474,7 +486,6 @@ long do_chdir(const char *path)
     } // If path does not refer to a directory
     vput(&curproc->p_cwd);
     curproc->p_cwd=res_vnode; // Set it to the directory represented by path
-    vref(curproc->p_cwd);
     // TODO: In this situation, should we decresase the ref count of res_vnode, because we set it as
     // current work directory and we may use it
     // NOT_YET_IMPLEMENTED("VFS: do_chdir");
@@ -509,9 +520,9 @@ ssize_t do_getdent(int fd, struct dirent *dirp)
     fput(&tmp_file);
     //NOT_YET_IMPLEMENTED("VFS: do_getdent");
     if(tmp>0) { 
-        return sizeof(dirp)+tmp;
+        return sizeof(struct dirent);
     } else  {   
-        return -1;  
+        return 0;  
     }
     // TODO: Not sure it is correct, because I'm not sure about the retern value from readdir, if it failed,
     // does the return value could be 0?
@@ -548,7 +559,7 @@ off_t do_lseek(int fd, off_t offset, int whence)
         offset=curproc->p_files[fd]->f_pos+offset;
     }
     else if(whence==SEEK_END){
-        offset=offset+sizeof(curproc->p_files[fd]); // TODO: Maybe the size of p_files[fd] can be represented by f_vnode->vn_len
+        offset=offset+curproc->p_files[fd]->f_vnode->vn_len; // TODO: Maybe the size of p_files[fd] can be represented by f_vnode->vn_len
     }
     // vunlock(curproc->p_files[fd]->f_vnode);
     // fput(&tmp_file);

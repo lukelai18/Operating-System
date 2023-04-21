@@ -103,7 +103,7 @@ void fput(file_t **filep)
 
     if (!file->f_refcount) // If the refcount drop to 0
     {
-        if (file->f_vnode)
+        if (file->f_vnode) // If the file's vnode is not empty, release it
         {
             vlock(file->f_vnode);
             if (file->f_vnode->vn_ops->release)  // call release

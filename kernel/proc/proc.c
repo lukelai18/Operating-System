@@ -212,8 +212,17 @@ proc_t *proc_create(const char *name)
         proc_initproc=new_proc;
     }
 
-    memset(new_proc->p_files, 0, sizeof(new_proc->p_files)); // Initialize VFS part
-    new_proc->p_cwd=NULL;
+    // memset(new_proc->p_files, 0, sizeof(new_proc->p_files)); // Initialize VFS part
+    for(int i=0;i<NFILES;i++){
+        new_proc->p_files[i]=curproc->p_files[i];
+        if(new_proc->p_files[i]!=NULL)  {
+            fref(new_proc->p_files[i]);
+        }
+    }
+    new_proc->p_cwd=curproc->p_cwd;
+    if(new_proc->p_cwd!=NULL){
+        vref(new_proc->p_cwd);
+    }
     // NOT_YET_IMPLEMENTED("PROCS: proc_create");
     return new_proc;
 }
