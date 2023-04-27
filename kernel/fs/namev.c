@@ -191,11 +191,17 @@ static const char *namev_tokenize(const char **search, size_t *len)
 long namev_dir(vnode_t *base, const char *path, vnode_t **res_vnode,
                const char **name, size_t *namelen)
 {
+    if(!S_ISDIR(base->vn_mode)){
+        return -ENOTDIR;
+    }
     if(strlen(path)==0||path==NULL){ // If path refers to an empty string 
         return -EINVAL;
     }
     if(path[0]=='/'){ // If path start with a /, set the base as root node
         base=vfs_root_fs.fs_root;
+    }
+    if(!S_ISDIR(base->vn_mode)){
+        return -ENOTDIR;
     }
     vref(base); 
     long tmp=0;
