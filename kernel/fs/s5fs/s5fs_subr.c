@@ -126,9 +126,47 @@ static inline void s5_release_file_block(pframe_t **pfp)
  */
 long s5_file_block_to_disk_block(s5_node_t *sn, size_t file_blocknum,
                                  int alloc)
-{
-    NOT_YET_IMPLEMENTED("S5FS: s5_file_block_to_disk_block");
-    return -1;
+{   
+    // s5fs_t *s5=FS_TO_S5FS(sn->vnode.vn_fs);
+    s5fs_t *s5=VNODE_TO_S5FS(&sn->vnode);
+    if(file_blocknum>=S5_MAX_FILE_BLOCKS)   {
+        return -EINVAL;
+    }
+    if(file_blocknum<S5_NDIRECT_BLOCKS){
+        if(alloc){ // If the alloc is set
+        // 1. We don't  need to care about it when the disk number is greater than 0
+        // 2. We should allocate a new disk number if it is a sparse block
+            if(sn->inode.s5_direct_blocks[file_blocknum]>0){
+                return sn->inode.s5_direct_blocks[file_blocknum];
+            } else {
+                long new_disk_blocknum=s5_alloc_block(s5);
+                sn->inode.s5_direct_blocks[file_blocknum]=new_disk_blocknum;
+                return new_disk_blocknum;
+            }           
+        }else{ // If alloc isn't set, just return
+            return sn->inode.s5_direct_blocks[file_blocknum];
+        }      
+    } else{ // If it is in indirect blocks
+         size_t indir_offset=file_blocknum-S5_NDIRECT_BLOCKS;
+         pframe_t *pf;
+         s5_get_disk_block(s5, file_blocknum, 0, &pf);
+         if(alloc){
+             if(((uint32_t *)pf->pf_addr)[indir_offset]>0){ // If the disk number is greater than 0
+                s5_release_file_block(&pf);
+                 return ((uint32_t *)pf->pf_addr)[indir_offset];
+             } else {
+                long new_disk_blocknum=s5_alloc_block(s5);
+                ((uint32_t *)pf->pf_addr)[indir_offset]=new_disk_blocknum;
+                s5_release_file_block(&pf);
+                return new_disk_blocknum;
+             }
+         } else {
+            s5_release_file_block(&pf);
+            return ((uint32_t *)pf->pf_addr)[indir_offset];
+         }
+    }
+    //NOT_YET_IMPLEMENTED("S5FS: s5_file_block_to_disk_block");
+    //return 0;
 }
 
 /* Read from a file.
@@ -152,8 +190,25 @@ long s5_file_block_to_disk_block(s5_node_t *sn, size_t file_blocknum,
  */
 ssize_t s5_read_file(s5_node_t *sn, size_t pos, char *buf, size_t len)
 {
-    NOT_YET_IMPLEMENTED("S5FS: s5_read_file");
-    return -1;
+    if(sn->vnode.vn_len<pos)    {return 0;} // If pos is greater than the length of file
+    s5fs_t *s5=VNODE_TO_S5FS(&sn->vnode);   
+    size_t blocknum=S5_DATA_BLOCK(pos); 
+    pframe_t *pf;
+    long tmp=s5_get_file_block(sn,blocknum, 0, &pf);    // Get the page frame of this block
+    if(tmp<0)   {return tmp;}
+    size_t block_offset=S5_DATA_OFFSET(pos);    // Obtain the offset within a block
+
+    ssize_t read_bytes=0; // The number of bytes read
+    if(pos+len<sn->vnode.vn_len){
+        memcpy(buf,((char *)pf->pf_addr)+block_offset,len);
+        read_bytes=len;
+    } else{
+        memcpy(buf,((char *)pf->pf_addr)+block_offset,sn->vnode.vn_len-pos);
+        read_bytes=sn->vnode.vn_len-pos;
+    }
+    s5_release_file_block(&pf);
+    // NOT_YET_IMPLEMENTED("S5FS: s5_read_file");
+    return read_bytes;
 }
 
 /* Write to a file.
@@ -187,9 +242,38 @@ ssize_t s5_read_file(s5_node_t *sn, size_t pos, char *buf, size_t len)
  *    inode to be the same. 
  */
 ssize_t s5_write_file(s5_node_t *sn, size_t pos, const char *buf, size_t len)
-{
-    NOT_YET_IMPLEMENTED("S5FS: s5_write_file");
-    return -1;
+{   
+    if(pos>=S5_MAX_FILE_SIZE)   {return -EFBIG;}
+    s5fs_t *s5=VNODE_TO_S5FS(&sn->vnode);
+    size_t blocknum=S5_DATA_BLOCK(pos);
+    pframe_t *pf;
+    size_t block_offset=S5_DATA_OFFSET(pos);
+
+    // If we need to extend the length of file, we need to update its size
+    size_t write_count=0;
+    size_t old_len=sn->vnode.vn_len;
+    if(pos+len>=sn->vnode.vn_len){ 
+        if(pos+len<S5_MAX_FILE_SIZE){ // Didn't reach the maximum file size
+            sn->vnode.vn_len+=len; 
+            write_count=len;
+        }  else if(pos+len>=S5_MAX_FILE_SIZE){ // Reached the maximum file size
+            sn->vnode.vn_len=S5_MAX_FILE_SIZE;
+            write_count=S5_MAX_FILE_SIZE-pos;
+        }
+        sn->inode.s5_un.s5_size=sn->vnode.vn_len;
+        sn->dirtied_inode=1; // Mark it as dirtied
+    }
+    long tmp=s5_get_file_block(sn,blocknum, 1, &pf);
+    if(tmp<0)   {
+        sn->vnode.vn_len=old_len; // Undo the changes we made
+        sn->inode.s5_un.s5_size=sn->vnode.vn_len;
+        sn->dirtied_inode=0; // Mark it as undirtied
+        return tmp;
+    }
+    memcpy(((char *)pf->pf_addr)+block_offset,buf,write_count);
+    s5_release_file_block(&pf);
+    // NOT_YET_IMPLEMENTED("S5FS: s5_write_file");
+    return write_count;
 }
 
 /* Allocate one block from the filesystem.
@@ -220,8 +304,29 @@ ssize_t s5_write_file(s5_node_t *sn, size_t pos, const char *buf, size_t len)
  */
 static long s5_alloc_block(s5fs_t *s5fs)
 {
+    s5_lock_super(s5fs);
+    s5_super_t *s=&s5fs->s5f_super;
+    
+    uint32_t s_blknum=0;
+    // If there are no more free blocks
+    if(s->s5s_nfree==0){ 
+        s_blknum=s->s5s_free_blocks[S5_NBLKS_PER_FNODE-1]; // Get the nex available block number
+        if(s_blknum==(uint32_t)-1){ 
+            s5_unlock_super(s5fs);
+            return -ENOSPC;
+        }
+        pframe_t *p;
+        s5_get_disk_block(s5fs,s_blknum,1,&p);
+        memcpy(s->s5s_free_blocks,(uint32_t *)p->pf_addr,sizeof(s->s5s_free_blocks));
+        s->s5s_nfree+=S5_NBLKS_PER_FNODE-1;
+    } else{
+        s_blknum=s->s5s_free_blocks[(s->s5s_nfree)-1];
+        s->s5s_nfree--;
+    }
+
+    s5_unlock_super(s5fs);
     NOT_YET_IMPLEMENTED("S5FS: s5_alloc_block");
-    return -1;
+    return s_blknum;
 }
 
 /*
@@ -413,7 +518,23 @@ long s5_find_dirent(s5_node_t *sn, const char *name, size_t namelen,
 {
     KASSERT(S_ISDIR(sn->vnode.vn_mode) && "should be handled at the VFS level");
     KASSERT(S5_BLOCK_SIZE == PAGE_SIZE && "be wary, thee");
-    NOT_YET_IMPLEMENTED("S5FS: s5_find_dirent");
+    s5_dirent_t *dir;
+    dir->s5d_inode=0;
+    memset(dir->s5d_name,0,sizeof(dir->s5d_name));
+    size_t pos=0;
+    while(pos<sn->vnode.vn_len){    // If pos is less then the size of file
+        memset(dir,0,sizeof(s5_dirent_t));
+        ssize_t read_bytes=s5_read_file(sn,pos,(char *)dir,sizeof(s5_dirent_t));
+        if(read_bytes<=0){  // Error message
+            return read_bytes;
+        }
+        if(name_match(dir->s5d_name,name,namelen)){
+            if(filepos!=NULL)   {*filepos=pos;}
+            return dir->s5d_inode;  // Return the inode number
+        }
+        pos+=read_bytes;
+    }  
+    // NOT_YET_IMPLEMENTED("S5FS: s5_find_dirent");
     return -1;
 }
 
@@ -445,7 +566,34 @@ void s5_remove_dirent(s5_node_t *sn, const char *name, size_t namelen,
 {
     vnode_t *dir = &sn->vnode;
     s5_inode_t *inode = &sn->inode;
-    NOT_YET_IMPLEMENTED("S5FS: s5_remove_dirent");
+    size_t file_pos=0; // The starting position of the directory entry
+    size_t dirent_size=sizeof(s5_dirent_t);
+    long ino_num=s5_find_dirent(sn,name,namelen,&file_pos);
+    
+    KASSERT(ino_num>0&&"It should have a valid inode number");
+    KASSERT(ino_num==child->inode.s5_number&&"The found directory entry corresponds to child");
+
+    // If it is in the middle, replace the removed dirent with the last one
+    if(file_pos+dirent_size<dir->vn_len){
+        // Read from the last entry of file firstly
+        s5_dirent_t *last_direntry; // The last entry of file
+        last_direntry->s5d_inode=0;
+        memset(last_direntry->s5d_name,0,sizeof(last_direntry->s5d_name));
+        ssize_t read_size=s5_read_file(sn,dir->vn_len-dirent_size,(char *)last_direntry,dirent_size);
+        KASSERT(read_size==(ssize_t)dirent_size&&"Make sure that we read the entire last directory entry");
+        ssize_t write_size=s5_write_file(sn,file_pos,(char *)last_direntry,dirent_size);
+        KASSERT(write_size==read_size && "Make sure the write size and read size are the same");
+    }
+
+    // Change the size of inode and vnode, mark it as dirtied
+    dir->vn_len-=dirent_size;
+    sn->inode.s5_un.s5_size=dir->vn_len;
+    sn->dirtied_inode=1;
+
+    // Reduce the refcount of child
+    child->inode.s5_linkcount--;
+    child->dirtied_inode=1;
+    // NOT_YET_IMPLEMENTED("S5FS: s5_remove_dirent");
 }
 
 /* Replace a directory entry.
@@ -475,6 +623,7 @@ void s5_replace_dirent(s5_node_t *sn, const char *name, size_t namelen,
 {
     vnode_t *dir = &sn->vnode;
     s5_inode_t *inode = &sn->inode;
+
     NOT_YET_IMPLEMENTED("RENAMEDIR: s5_replace_dirent()");
 }
 
@@ -498,9 +647,30 @@ long s5_link(s5_node_t *dir, const char *name, size_t namelen,
              s5_node_t *child)
 {
     KASSERT(kmutex_owns_mutex(&dir->vnode.vn_mobj.mo_mutex));
-
-    NOT_YET_IMPLEMENTED("S5FS: s5_link");
-    return -1;
+    size_t file_pos=0;
+    // Check if the new entry already exist
+    if(s5_find_dirent(dir,name,namelen,&file_pos)){
+        return -EEXIST;
+    }
+    // Initialize the new entry
+    s5_dirent_t *dirent1;
+    dirent1->s5d_inode=0;
+    memset(dirent1->s5d_name,0,sizeof(dirent1->s5d_name));
+    memcpy(dirent1->s5d_name,name,namelen);
+    dirent1->s5d_name[namelen]='\0';
+    dirent1->s5d_inode=child->inode.s5_number;
+    
+    // Increase the linkcount of child
+    child->inode.s5_linkcount++;
+    
+    // Write the new directory entry into dir
+    ssize_t write_bytes=s5_write_file(dir,file_pos,(char *)dirent1,namelen);
+    if(write_bytes<0){
+        child->inode.s5_linkcount--;
+    }
+    child->dirtied_inode=1;
+    // NOT_YET_IMPLEMENTED("S5FS: s5_link");
+    return 0;
 }
 
 /* Return the number of file blocks allocated for sn. This means any
@@ -515,8 +685,30 @@ long s5_link(s5_node_t *dir, const char *name, size_t namelen,
  */
 long s5_inode_blocks(s5_node_t *sn)
 {
-    NOT_YET_IMPLEMENTED("S5FS: s5_inode_blocks");
-    return -1;
+    long count=0;
+
+    // Count the direct blocks
+    for(int i=0;i<S5_NDIRECT_BLOCKS;i++){ 
+        // If the block is not sparse block
+        if(sn->inode.s5_direct_blocks[i]){
+            count++;
+        }
+    }
+
+    // If the indirect blocks exist
+    if(sn->inode.s5_indirect_block){
+        count++;
+        pframe_t *pf;
+        s5_get_disk_block(VNODE_TO_S5FS(&sn->vnode),sn->inode.s5_indirect_block,0,&pf);
+        for(int i=0;i<S5_NDIRECT_BLOCKS;i++){
+            if((uint32_t *)pf->pf_addr+i){
+                count++;
+            }
+        }
+        s5_release_disk_block(&pf);
+    }
+    // NOT_YET_IMPLEMENTED("S5FS: s5_inode_blocks");
+    return count;
 }
 
 /**
