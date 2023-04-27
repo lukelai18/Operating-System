@@ -739,16 +739,16 @@ static long s5fs_readdir(vnode_t *vnode, size_t pos, struct dirent *d)
     KASSERT(S_ISDIR(vnode->vn_mode) && "should be handled at the VFS level");
     
     s5_node_t *s5node=VNODE_TO_S5NODE(vnode);
-    s5_dirent_t *s5_dir;
-    s5_dir->s5d_inode=0;
-    memset(s5_dir->s5d_name,0,sizeof(s5_dir->s5d_name));
+    s5_dirent_t s5_dir;
+    s5_dir.s5d_inode=0;
+    memset(s5_dir.s5d_name,0,sizeof(s5_dir.s5d_name));
     // Read from s5node into s5_dir
-    ssize_t read_num=s5_read_file(s5node,pos,(char *)s5_dir,sizeof(s5_dirent_t));
+    ssize_t read_num=s5_read_file(s5node,pos,(char *)&s5_dir,sizeof(s5_dirent_t));
     if(read_num<0)  {return read_num;}
 
     // If read successfully, initialize d_ino
-    d->d_ino=s5_dir->s5d_inode;
-    strcpy(d->d_name,s5_dir->s5d_name);
+    d->d_ino=s5_dir.s5d_inode;
+    strcpy(d->d_name,s5_dir.s5d_name);
     d->d_off=pos+read_num;
     // NOT_YET_IMPLEMENTED("S5FS: s5fs_readdir");
     

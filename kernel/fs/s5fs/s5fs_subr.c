@@ -518,19 +518,19 @@ long s5_find_dirent(s5_node_t *sn, const char *name, size_t namelen,
 {
     KASSERT(S_ISDIR(sn->vnode.vn_mode) && "should be handled at the VFS level");
     KASSERT(S5_BLOCK_SIZE == PAGE_SIZE && "be wary, thee");
-    s5_dirent_t *dir;
-    dir->s5d_inode=0;
-    memset(dir->s5d_name,0,sizeof(dir->s5d_name));
+    s5_dirent_t dir;
+    dir.s5d_inode=0;
+    memset(dir.s5d_name,0,sizeof(dir.s5d_name));
     size_t pos=0;
     while(pos<sn->vnode.vn_len){    // If pos is less then the size of file
-        memset(dir,0,sizeof(s5_dirent_t));
-        ssize_t read_bytes=s5_read_file(sn,pos,(char *)dir,sizeof(s5_dirent_t));
+        memset(&dir,0,sizeof(s5_dirent_t));
+        ssize_t read_bytes=s5_read_file(sn,pos,(char *)&dir,sizeof(s5_dirent_t));
         if(read_bytes<=0){  // Error message
             return read_bytes;
         }
-        if(name_match(dir->s5d_name,name,namelen)){
+        if(name_match(dir.s5d_name,name,namelen)){
             if(filepos!=NULL)   {*filepos=pos;}
-            return dir->s5d_inode;  // Return the inode number
+            return dir.s5d_inode;  // Return the inode number
         }
         pos+=read_bytes;
     }  
@@ -576,12 +576,12 @@ void s5_remove_dirent(s5_node_t *sn, const char *name, size_t namelen,
     // If it is in the middle, replace the removed dirent with the last one
     if(file_pos+dirent_size<dir->vn_len){
         // Read from the last entry of file firstly
-        s5_dirent_t *last_direntry; // The last entry of file
-        last_direntry->s5d_inode=0;
-        memset(last_direntry->s5d_name,0,sizeof(last_direntry->s5d_name));
-        ssize_t read_size=s5_read_file(sn,dir->vn_len-dirent_size,(char *)last_direntry,dirent_size);
+        s5_dirent_t last_direntry; // The last entry of file
+        last_direntry.s5d_inode=0;
+        memset(last_direntry.s5d_name,0,sizeof(last_direntry.s5d_name));
+        ssize_t read_size=s5_read_file(sn,dir->vn_len-dirent_size,(char *)&last_direntry,dirent_size);
         KASSERT(read_size==(ssize_t)dirent_size&&"Make sure that we read the entire last directory entry");
-        ssize_t write_size=s5_write_file(sn,file_pos,(char *)last_direntry,dirent_size);
+        ssize_t write_size=s5_write_file(sn,file_pos,(char *)&last_direntry,dirent_size);
         KASSERT(write_size==read_size && "Make sure the write size and read size are the same");
     }
 
@@ -653,18 +653,18 @@ long s5_link(s5_node_t *dir, const char *name, size_t namelen,
         return -EEXIST;
     }
     // Initialize the new entry
-    s5_dirent_t *dirent1;
-    dirent1->s5d_inode=0;
+    s5_dirent_t dirent1;
+    // dirent1->s5d_inode=0;
     // memset(dirent1->s5d_name,0,sizeof(dirent1->s5d_name));
-    memcpy(dirent1->s5d_name,name,namelen);
-    dirent1->s5d_name[namelen]='\0';
-    dirent1->s5d_inode=child->inode.s5_number;
+    memcpy(dirent1.s5d_name,name,namelen);
+    dirent1.s5d_name[namelen]='\0';
+    dirent1.s5d_inode=child->vnode.vn_len;
     
     // Increase the linkcount of child
     child->inode.s5_linkcount++;
     
     // Write the new directory entry into dir
-    ssize_t write_bytes=s5_write_file(dir,file_pos,(char *)dirent1,namelen);
+    ssize_t write_bytes=s5_write_file(dir,file_pos,(char *)&dirent1,namelen);
     if(write_bytes<0){
         child->inode.s5_linkcount--;
     }
