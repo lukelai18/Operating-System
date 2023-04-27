@@ -231,7 +231,7 @@ void sched_switch(ktqueue_t *queue, spinlock_t *lock)
     intr_setipl(tmp); // Return to the original interrupt level
     intr_enable(); // Enable instruction
     
-    NOT_YET_IMPLEMENTED("PROCS: sched_switch");
+    // NOT_YET_IMPLEMENTED("PROCS: sched_switch");
 }
 
 /*

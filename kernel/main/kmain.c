@@ -166,6 +166,7 @@ static void *initproc_run(long arg1, void *arg2)
     vfs_init();
     make_devices();
 #endif
+vfstest_main(1,NULL);
 /* To create a kshell on each terminal */
 #ifdef __DRIVERS__
     char name[32] = {0};

@@ -655,7 +655,7 @@ long s5_link(s5_node_t *dir, const char *name, size_t namelen,
     // Initialize the new entry
     s5_dirent_t *dirent1;
     dirent1->s5d_inode=0;
-    memset(dirent1->s5d_name,0,sizeof(dirent1->s5d_name));
+    // memset(dirent1->s5d_name,0,sizeof(dirent1->s5d_name));
     memcpy(dirent1->s5d_name,name,namelen);
     dirent1->s5d_name[namelen]='\0';
     dirent1->s5d_inode=child->inode.s5_number;
