@@ -200,9 +200,9 @@ long namev_dir(vnode_t *base, const char *path, vnode_t **res_vnode,
     if(path[0]=='/'){ // If path start with a /, set the base as root node
         base=vfs_root_fs.fs_root;
     }
-    if(!S_ISDIR(base->vn_mode)){
-        return -ENOTDIR;
-    }
+    // if(!S_ISDIR(base->vn_mode)){
+    //     return -ENOTDIR;
+    // }
     vref(base); 
     long tmp=0;
     const char *cur_token;  // Store the current token and next token

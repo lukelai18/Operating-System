@@ -209,18 +209,27 @@ static void s5fs_read_vnode(fs_t *fs, vnode_t *vn)
     s5_node->dirtied_inode=1; // Initialize dirty inode
     (s5_node->inode)=*((s5_inode_t *)(founded_pfram->pf_addr)+in_offset); // Initialize inode
     vn->vn_len=s5_node->inode.s5_un.s5_size; // Initialize the file length
-    vn->vn_mode=s5_node->inode.s5_type; // File type
-    vn->vn_ops=&s5fs_file_vops;
-    // s5_node->inode.s5_linkcount++;
 
     switch(s5_node->inode.s5_type){
         case S5_TYPE_CHR:
+            vn->vn_mode=S_IFCHR;
             vn->vn_devid=s5_node->inode.s5_indirect_block;
             vn->vn_ops=NULL;
             break;
         case S5_TYPE_BLK:
+            vn->vn_mode=S_IFBLK;
             vn->vn_devid=s5_node->inode.s5_indirect_block;
             vn->vn_ops=NULL;
+            break;
+        case S5_TYPE_DATA:
+            vn->vn_mode=S_IFREG;
+            vn->vn_devid=0;
+            vn->vn_ops=&s5fs_file_vops;
+            break;
+        case S5_TYPE_DIR:
+            vn->vn_mode=S_IFDIR;
+            vn->vn_devid=0;
+            vn->vn_ops=&s5fs_dir_vops;
             break;
     }
     s5_release_disk_block(&founded_pfram); // Release the page frame
@@ -633,19 +642,19 @@ static long s5fs_mkdir(vnode_t *dir, const char *name, size_t namelen,
     if(ino<0)   {return ino;}
 
     // Obtain child vnode
-    vnode_t *chl_vnode=vget(s5->s5f_fs,ino);
+    vnode_t *chl_vnode=vget_locked(s5->s5f_fs,ino);
     s5_node_t *chl_node=VNODE_TO_S5NODE(chl_vnode);
 
     long tmp1=s5_link(chl_node,dot,1,chl_node); // Represent the directory itself
     if(tmp1<0)  {
-        vput(&chl_vnode);
+        vput_locked(&chl_vnode);
         s5_free_inode(s5,ino);
         return tmp1;
     }
     long tmp2=s5_link(par_node,doubleDot,2,chl_node); // Parent directory and child directory
     if(tmp2<0){
         s5fs_unlink(chl_vnode,dot,1); // Undo the previous steps
-        vput(&chl_vnode);
+        vput_locked(&chl_vnode);
         s5_free_inode(s5,ino);
         return tmp2;
     }
@@ -655,12 +664,12 @@ static long s5fs_mkdir(vnode_t *dir, const char *name, size_t namelen,
     if(tmp3<0){
         s5fs_unlink(chl_vnode,dot,1);
         s5fs_unlink(dir,doubleDot,2);
-        vput(&chl_vnode);
+        vput_locked(&chl_vnode);
         s5_free_inode(s5,ino);
         return tmp3;
     }
     *out=chl_vnode;
-    vput(&chl_vnode);
+    vunlock(chl_vnode);
     // NOT_YET_IMPLEMENTED("S5FS: s5fs_mkdir");
     return 0;
 }

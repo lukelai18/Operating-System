@@ -191,24 +191,41 @@ long s5_file_block_to_disk_block(s5_node_t *sn, size_t file_blocknum,
 ssize_t s5_read_file(s5_node_t *sn, size_t pos, char *buf, size_t len)
 {
     if(sn->vnode.vn_len<pos)    {return 0;} // If pos is greater than the length of file
-    s5fs_t *s5=VNODE_TO_S5FS(&sn->vnode);   
-    size_t blocknum=S5_DATA_BLOCK(pos); 
+    // s5fs_t *s5=VNODE_TO_S5FS(&sn->vnode);   
     pframe_t *pf;
-    long tmp=s5_get_file_block(sn,blocknum, 0, &pf);    // Get the page frame of this block
-    if(tmp<0)   {return tmp;}
-    size_t block_offset=S5_DATA_OFFSET(pos);    // Obtain the offset within a block
 
-    ssize_t read_bytes=0; // The number of bytes read
-    if(pos+len<sn->vnode.vn_len){
-        memcpy(buf,((char *)pf->pf_addr)+block_offset,len);
-        read_bytes=len;
-    } else{
-        memcpy(buf,((char *)pf->pf_addr)+block_offset,sn->vnode.vn_len-pos);
-        read_bytes=sn->vnode.vn_len-pos;
+    ssize_t cur_read_bytes=0; // The number of bytes read
+    ssize_t total_read_bytes=0;
+    size_t start=pos;
+    size_t end = pos + len;
+
+    if (end > sn->vnode.vn_len) {
+        end = sn->vnode.vn_len;
     }
-    s5_release_file_block(&pf);
+
+    while(start+total_read_bytes<end){
+        size_t block_offset=S5_DATA_OFFSET(pos);    // Obtain the offset within a block         
+        size_t blocknum=S5_DATA_BLOCK(pos);     // Get the block number
+        long tmp=s5_get_file_block(sn,blocknum, 0, &pf);    // Get the page frame of this block
+        if(tmp<0)   {return tmp;}
+
+        // Check if it needs additional block
+        if(S5_BLOCK_SIZE-block_offset<=end-pos){
+            cur_read_bytes=S5_BLOCK_SIZE-block_offset;
+        } else{
+            cur_read_bytes=end-pos;
+        }
+        
+        // Copy the byte in the block into buf
+        memcpy(buf,((char *)pf->pf_addr)+block_offset,cur_read_bytes);
+
+        pos+=cur_read_bytes;       // Update the position in file
+        total_read_bytes+=cur_read_bytes;   // Update the total read bytes
+        s5_release_file_block(&pf);
+    }
+    
     // NOT_YET_IMPLEMENTED("S5FS: s5_read_file");
-    return read_bytes;
+    return total_read_bytes;
 }
 
 /* Write to a file.
@@ -243,37 +260,65 @@ ssize_t s5_read_file(s5_node_t *sn, size_t pos, char *buf, size_t len)
  */
 ssize_t s5_write_file(s5_node_t *sn, size_t pos, const char *buf, size_t len)
 {   
+    KASSERT(sn->vnode.vn_len<=S5_MAX_FILE_SIZE&& "Make sure the file size is valid");
+    
     if(pos>=S5_MAX_FILE_SIZE)   {return -EFBIG;}
-    s5fs_t *s5=VNODE_TO_S5FS(&sn->vnode);
-    size_t blocknum=S5_DATA_BLOCK(pos);
     pframe_t *pf;
-    size_t block_offset=S5_DATA_OFFSET(pos);
 
-    // If we need to extend the length of file, we need to update its size
-    size_t write_count=0;
+    ssize_t cur_write_bytes=0; // The number of bytes read
+    ssize_t total_write_bytes=0; // The number was writtem
+    ssize_t need_to_write=0;
     size_t old_len=sn->vnode.vn_len;
+    size_t start=pos;
+    size_t end=0;
+
+    // Update the length of file if necessary
     if(pos+len>=sn->vnode.vn_len){ 
-        if(pos+len<S5_MAX_FILE_SIZE){ // Didn't reach the maximum file size
-            sn->vnode.vn_len+=len; 
-            write_count=len;
+        if(pos+len>=sn->vnode.vn_len&&pos+len<S5_MAX_FILE_SIZE){ // Didn't reach the maximum file size
+            sn->vnode.vn_len=pos+len; 
+            need_to_write=len;
+            end=pos+len-1;    // Get the end writing position
         }  else if(pos+len>=S5_MAX_FILE_SIZE){ // Reached the maximum file size
             sn->vnode.vn_len=S5_MAX_FILE_SIZE;
-            write_count=S5_MAX_FILE_SIZE-pos;
-        }
+            need_to_write=S5_MAX_FILE_SIZE-pos;
+            end=sn->vnode.vn_len;
+        } 
         sn->inode.s5_un.s5_size=sn->vnode.vn_len;
         sn->dirtied_inode=1; // Mark it as dirtied
+    } else {
+        need_to_write=len;
+        end=pos+len-1;    // Get the end writing position
     }
-    long tmp=s5_get_file_block(sn,blocknum, 1, &pf);
-    if(tmp<0)   {
-        sn->vnode.vn_len=old_len; // Undo the changes we made
-        sn->inode.s5_un.s5_size=sn->vnode.vn_len;
-        sn->dirtied_inode=0; // Mark it as undirtied
-        return tmp;
+
+    // Get the new end of the file
+
+    while(total_write_bytes<need_to_write){
+        size_t block_offset=S5_DATA_OFFSET(pos);    // Obtain the offset within a block         
+        size_t blocknum=S5_DATA_BLOCK(pos);     // Get the block number
+        long tmp=s5_get_file_block(sn,blocknum, 0, &pf);    // Get the page frame of this block
+        if(tmp<0)   {
+            sn->vnode.vn_len=old_len; // Undo the changes we made
+            sn->inode.s5_un.s5_size=sn->vnode.vn_len;
+            sn->dirtied_inode=0; // Mark it as undirtied
+            return tmp;
+        }
+
+        // Get the bytes need to be written
+        if(S5_BLOCK_SIZE-block_offset<=end-pos){
+            cur_write_bytes=S5_BLOCK_SIZE-block_offset;
+        } else{
+            cur_write_bytes=end-pos;
+        }
+        memcpy(((char *)pf->pf_addr)+block_offset,buf,cur_write_bytes);
+
+        total_write_bytes+=cur_write_bytes;  // Update the total write file
+        pos+=cur_write_bytes; // Update the current position of file
+
+        s5_release_file_block(&pf);
     }
-    memcpy(((char *)pf->pf_addr)+block_offset,buf,write_count);
-    s5_release_file_block(&pf);
+   
     // NOT_YET_IMPLEMENTED("S5FS: s5_write_file");
-    return write_count;
+    return total_write_bytes;
 }
 
 /* Allocate one block from the filesystem.
@@ -519,8 +564,8 @@ long s5_find_dirent(s5_node_t *sn, const char *name, size_t namelen,
     KASSERT(S_ISDIR(sn->vnode.vn_mode) && "should be handled at the VFS level");
     KASSERT(S5_BLOCK_SIZE == PAGE_SIZE && "be wary, thee");
     s5_dirent_t dir;
-    dir.s5d_inode=0;
-    memset(dir.s5d_name,0,sizeof(dir.s5d_name));
+    // dir.s5d_inode=0;
+    // memset(dir.s5d_name,0,sizeof(dir.s5d_name));
     size_t pos=0;
     while(pos<sn->vnode.vn_len){    // If pos is less then the size of file
         memset(&dir,0,sizeof(s5_dirent_t));
@@ -535,7 +580,7 @@ long s5_find_dirent(s5_node_t *sn, const char *name, size_t namelen,
         pos+=read_bytes;
     }  
     // NOT_YET_IMPLEMENTED("S5FS: s5_find_dirent");
-    return -1;
+    return -ENOENT;
 }
 
 /* Remove the directory entry specified by name and namelen from the directory
