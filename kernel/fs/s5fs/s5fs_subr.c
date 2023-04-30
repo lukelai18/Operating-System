@@ -218,7 +218,7 @@ ssize_t s5_read_file(s5_node_t *sn, size_t pos, char *buf, size_t len)
         
         // Copy the byte in the block into buf
         memcpy(buf,((char *)pf->pf_addr)+block_offset,cur_read_bytes);
-
+        buf=buf+cur_read_bytes;
         pos+=cur_read_bytes;       // Update the position in file
         total_read_bytes+=cur_read_bytes;   // Update the total read bytes
         s5_release_file_block(&pf);
@@ -570,6 +570,9 @@ long s5_find_dirent(s5_node_t *sn, const char *name, size_t namelen,
     while(pos<sn->vnode.vn_len){    // If pos is less then the size of file
         memset(&dir,0,sizeof(s5_dirent_t));
         ssize_t read_bytes=s5_read_file(sn,pos,(char *)&dir,sizeof(s5_dirent_t));
+
+        KASSERT(read_bytes==sizeof(s5_dirent_t));
+
         if(read_bytes<=0){  // Error message
             return read_bytes;
         }
@@ -694,7 +697,7 @@ long s5_link(s5_node_t *dir, const char *name, size_t namelen,
     KASSERT(kmutex_owns_mutex(&dir->vnode.vn_mobj.mo_mutex));
     size_t file_pos=0;
     // Check if the new entry already exist
-    if(s5_find_dirent(dir,name,namelen,&file_pos)){
+    if(s5_find_dirent(dir,name,namelen,&file_pos)>=0){
         return -EEXIST;
     }
     // Initialize the new entry
