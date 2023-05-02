@@ -203,11 +203,12 @@ static void s5fs_read_vnode(fs_t *fs, vnode_t *vn)
     s5_node_t *s5_node=VNODE_TO_S5NODE(vn); // Get s5 node
     s5fs_t* s5= FS_TO_S5FS(fs); // Get the s5fs object
     blocknum_t b_num=S5_INODE_BLOCK(vn->vn_vno); // Block number containing the inode info
-    long in_offset=S5_INODE_OFFSET(b_num); // Find the desired inode
+    long in_offset=S5_INODE_OFFSET(vn->vn_vno); // Find the desired inode
     s5_get_disk_block(s5,b_num,0,&founded_pfram);
 
     s5_node->dirtied_inode=1; // Initialize dirty inode
-    (s5_node->inode)=*((s5_inode_t *)(founded_pfram->pf_addr)+in_offset); // Initialize inode
+    // (s5_node->inode)=*((s5_inode_t *)(founded_pfram->pf_addr)+in_offset); // Initialize inode
+    memcpy(&s5_node->inode,((s5_inode_t *)(founded_pfram->pf_addr)+in_offset),sizeof(s5_inode_t));
     vn->vn_len=s5_node->inode.s5_un.s5_size; // Initialize the file length
 
     switch(s5_node->inode.s5_type){
@@ -253,7 +254,7 @@ static void s5fs_delete_vnode(fs_t *fs, vnode_t *vn)
     s5_node_t *s5_node=VNODE_TO_S5NODE(vn); // Get s5 node
     s5fs_t* s5= FS_TO_S5FS(fs); // Get the s5fs object
     blocknum_t b_num=S5_INODE_BLOCK(vn->vn_vno); // Block number containing the inode info
-    long in_offset=S5_INODE_OFFSET(b_num); // Find the desired inode
+    long in_offset=S5_INODE_OFFSET(vn->vn_vno); // Find the desired inode
     s5_get_disk_block(s5,b_num,1,&founded_pfram);
 
     // If it is dirty, copy the data to the page frame
@@ -348,7 +349,7 @@ static ssize_t s5fs_write(vnode_t *vnode, size_t pos, const void *buf,
  */
 static long s5fs_mmap(vnode_t *file, mobj_t **ret)
 {
-    vput(&file);
+    mobj_ref(&file->vn_mobj);   // Add a reference to the underlying mobj
     *ret=&file->vn_mobj;
     // NOT_YET_IMPLEMENTED("VM: s5fs_mmap");
     return 0;
@@ -398,14 +399,14 @@ static long s5fs_mknod(struct vnode *dir, const char *name, size_t namelen,
     s5_node_t *s5_parent_node=VNODE_TO_S5NODE(dir); // Get the s5node of parent directory
     long new_ino=s5_alloc_inode(s5,mode,devid);  // Get the new inode number
     if(new_ino<0)  {return new_ino;}
-    *out=vget(s5->s5f_fs,new_ino); // Get corresponding vnode fot the new inode number
-    s5_node_t *s5_child_node=VNODE_TO_S5NODE(*out);
+    vnode_t *chi_vnode=vget(s5->s5f_fs,new_ino); // Get corresponding vnode fot the new inode number
+    s5_node_t *s5_child_node=VNODE_TO_S5NODE(chi_vnode);
     long tmp=s5_link(s5_parent_node,name,namelen,s5_child_node);  // Link these two inodes
     if(tmp<0)   {
-        vput(out);  // Decremment the reference of child node
+        vput(&chi_vnode);  // Decremment the reference of child node
         return tmp;
     }
-    vput(out);
+    *out=chi_vnode;
     // NOT_YET_IMPLEMENTED("S5FS: s5fs_mknod");
     return 0;
 }
@@ -432,6 +433,7 @@ long s5fs_lookup(vnode_t *dir, const char *name, size_t namelen,
     long find_ino=s5_find_dirent(s5node,name,namelen,NULL);
     if(find_ino<0)  {return find_ino;}
     *ret=vget(dir->vn_fs,find_ino);
+    // TODO: Not sure, because the refcount of ret has been increased in vget
     if(*ret==dir)   {vref(dir);}
     // NOT_YET_IMPLEMENTED("S5FS: s5fs_lookup");
     return 0;
@@ -700,29 +702,31 @@ static long s5fs_rmdir(vnode_t *parent, const char *name, size_t namelen)
     s5fs_t *par_s5= VNODE_TO_S5FS(parent);
     long ino=s5_find_dirent(par_node,name,namelen,NULL); // Obtain the child inode
     if(ino<0)   {return ino;}
-    // 建议Lock
-    vnode_t *child=vget(par_s5->s5f_fs,ino); // Obtain child vnode
+    // May Lock
+    vnode_t *child=vget_locked(par_s5->s5f_fs,ino); // Obtain child vnode
     s5_node_t *chl_node=VNODE_TO_S5NODE(child);
     const char *dot=".";
     const char *doubleDot="..";
     long ino1=s5_find_dirent(chl_node,dot,1,NULL); // Check the two entries
     if(ino1<0)  {
-        vput(&child);
+        vput_locked(&child);
         return ino1;
     }
     long ino2=s5_find_dirent(chl_node,doubleDot,2,NULL);
     if(ino2<0)  {
-        vput(&child);
+        vput_locked(&child);
         return ino2;
     }
 
     // Remove the three entries created in mkdir
     par_node->dirtied_inode=1; // Mark it as dirtied
+    chl_node->dirtied_inode=1;
     s5_remove_dirent(chl_node,dot,1,chl_node);
     s5_remove_dirent(par_node,doubleDot,2,chl_node);
     s5_remove_dirent(par_node,name,namelen,chl_node);
     par_node->inode.s5_linkcount-=2;
-    vput(&child);
+    chl_node->inode.s5_linkcount-=2;
+    vput_locked(&child);
     // NOT_YET_IMPLEMENTED("S5FS: s5fs_rmdir");
     return 0;
 }
@@ -749,8 +753,8 @@ static long s5fs_readdir(vnode_t *vnode, size_t pos, struct dirent *d)
     
     s5_node_t *s5node=VNODE_TO_S5NODE(vnode);
     s5_dirent_t s5_dir;
-    s5_dir.s5d_inode=0;
-    memset(s5_dir.s5d_name,0,sizeof(s5_dir.s5d_name));
+    //s5_dir.s5d_inode=0;
+    //memset(s5_dir.s5d_name,0,sizeof(s5_dir.s5d_name));
     // Read from s5node into s5_dir
     ssize_t read_num=s5_read_file(s5node,pos,(char *)&s5_dir,sizeof(s5_dirent_t));
     if(read_num<0)  {return read_num;}

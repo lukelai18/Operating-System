@@ -132,7 +132,7 @@ long s5_file_block_to_disk_block(s5_node_t *sn, size_t file_blocknum,
     if(file_blocknum>=S5_MAX_FILE_BLOCKS)   {
         return -EINVAL;
     }
-    if(file_blocknum<S5_NDIRECT_BLOCKS){
+    if(file_blocknum<S5_NDIRECT_BLOCKS){ // If it is in direct blocks
         if(alloc){ // If the alloc is set
         // 1. We don't  need to care about it when the disk number is greater than 0
         // 2. We should allocate a new disk number if it is a sparse block
@@ -140,6 +140,7 @@ long s5_file_block_to_disk_block(s5_node_t *sn, size_t file_blocknum,
                 return sn->inode.s5_direct_blocks[file_blocknum];
             } else {
                 long new_disk_blocknum=s5_alloc_block(s5);
+                if(new_disk_blocknum<0) {return new_disk_blocknum;}
                 sn->inode.s5_direct_blocks[file_blocknum]=new_disk_blocknum;
                 return new_disk_blocknum;
             }           
@@ -152,17 +153,20 @@ long s5_file_block_to_disk_block(s5_node_t *sn, size_t file_blocknum,
          s5_get_disk_block(s5, file_blocknum, 0, &pf);
          if(alloc){
              if(((uint32_t *)pf->pf_addr)[indir_offset]>0){ // If the disk number is greater than 0
+                long disk_blocknum=((uint32_t *)pf->pf_addr)[indir_offset];
                 s5_release_file_block(&pf);
-                 return ((uint32_t *)pf->pf_addr)[indir_offset];
+                return disk_blocknum;
              } else {
                 long new_disk_blocknum=s5_alloc_block(s5);
+                if(new_disk_blocknum<0) {return new_disk_blocknum;}
                 ((uint32_t *)pf->pf_addr)[indir_offset]=new_disk_blocknum;
                 s5_release_file_block(&pf);
                 return new_disk_blocknum;
              }
          } else {
+            long disk_blocknum=((uint32_t *)pf->pf_addr)[indir_offset];
             s5_release_file_block(&pf);
-            return ((uint32_t *)pf->pf_addr)[indir_offset];
+            return disk_blocknum;
          }
     }
     //NOT_YET_IMPLEMENTED("S5FS: s5_file_block_to_disk_block");
@@ -190,7 +194,7 @@ long s5_file_block_to_disk_block(s5_node_t *sn, size_t file_blocknum,
  */
 ssize_t s5_read_file(s5_node_t *sn, size_t pos, char *buf, size_t len)
 {
-    if(sn->vnode.vn_len<pos)    {return 0;} // If pos is greater than the length of file
+    if(sn->vnode.vn_len<=pos)    {return 0;} // If pos is greater than the length of file
     // s5fs_t *s5=VNODE_TO_S5FS(&sn->vnode);   
     pframe_t *pf;
 
@@ -218,7 +222,7 @@ ssize_t s5_read_file(s5_node_t *sn, size_t pos, char *buf, size_t len)
         
         // Copy the byte in the block into buf
         memcpy(buf,((char *)pf->pf_addr)+block_offset,cur_read_bytes);
-        buf=buf+cur_read_bytes;
+        buf+=cur_read_bytes;
         pos+=cur_read_bytes;       // Update the position in file
         total_read_bytes+=cur_read_bytes;   // Update the total read bytes
         s5_release_file_block(&pf);
@@ -265,7 +269,7 @@ ssize_t s5_write_file(s5_node_t *sn, size_t pos, const char *buf, size_t len)
     if(pos>=S5_MAX_FILE_SIZE)   {return -EFBIG;}
     pframe_t *pf;
 
-    ssize_t cur_write_bytes=0; // The number of bytes read
+    ssize_t cur_write_bytes=0; // The number of bytes need to be written
     ssize_t total_write_bytes=0; // The number was writtem
     ssize_t need_to_write=0;
     size_t old_len=sn->vnode.vn_len;
@@ -273,12 +277,12 @@ ssize_t s5_write_file(s5_node_t *sn, size_t pos, const char *buf, size_t len)
     size_t end=0;
 
     // Update the length of file if necessary
-    if(pos+len>=sn->vnode.vn_len){ 
-        if(pos+len>=sn->vnode.vn_len&&pos+len<S5_MAX_FILE_SIZE){ // Didn't reach the maximum file size
+    if(pos+len>sn->vnode.vn_len){ 
+        if(pos+len>sn->vnode.vn_len&&pos+len<=S5_MAX_FILE_SIZE){ // Didn't reach the maximum file size
             sn->vnode.vn_len=pos+len; 
             need_to_write=len;
-            end=pos+len-1;    // Get the end writing position
-        }  else if(pos+len>=S5_MAX_FILE_SIZE){ // Reached the maximum file size
+            end=pos+len;    // Get the end writing position
+        }  else if(pos+len>S5_MAX_FILE_SIZE){ // Reached the maximum file size
             sn->vnode.vn_len=S5_MAX_FILE_SIZE;
             need_to_write=S5_MAX_FILE_SIZE-pos;
             end=sn->vnode.vn_len;
@@ -287,7 +291,7 @@ ssize_t s5_write_file(s5_node_t *sn, size_t pos, const char *buf, size_t len)
         sn->dirtied_inode=1; // Mark it as dirtied
     } else {
         need_to_write=len;
-        end=pos+len-1;    // Get the end writing position
+        end=pos+len;    // Get the end writing position
     }
 
     // Get the new end of the file
@@ -295,7 +299,7 @@ ssize_t s5_write_file(s5_node_t *sn, size_t pos, const char *buf, size_t len)
     while(total_write_bytes<need_to_write){
         size_t block_offset=S5_DATA_OFFSET(pos);    // Obtain the offset within a block         
         size_t blocknum=S5_DATA_BLOCK(pos);     // Get the block number
-        long tmp=s5_get_file_block(sn,blocknum, 0, &pf);    // Get the page frame of this block
+        long tmp=s5_get_file_block(sn,blocknum, 1, &pf);    // Get the page frame of this block
         if(tmp<0)   {
             sn->vnode.vn_len=old_len; // Undo the changes we made
             sn->inode.s5_un.s5_size=sn->vnode.vn_len;
@@ -309,7 +313,7 @@ ssize_t s5_write_file(s5_node_t *sn, size_t pos, const char *buf, size_t len)
         } else{
             cur_write_bytes=end-pos;
         }
-        memcpy(((char *)pf->pf_addr)+block_offset,buf,cur_write_bytes);
+        memcpy(((char *)pf->pf_addr)+block_offset+total_write_bytes,buf,cur_write_bytes);
 
         total_write_bytes+=cur_write_bytes;  // Update the total write file
         pos+=cur_write_bytes; // Update the current position of file
@@ -355,7 +359,7 @@ static long s5_alloc_block(s5fs_t *s5fs)
     uint32_t s_blknum=0;
     // If there are no more free blocks
     if(s->s5s_nfree==0){ 
-        s_blknum=s->s5s_free_blocks[S5_NBLKS_PER_FNODE-1]; // Get the nex available block number
+        s_blknum=s->s5s_free_blocks[S5_NBLKS_PER_FNODE-1]; // Get the next available block number
         if(s_blknum==(uint32_t)-1){ 
             s5_unlock_super(s5fs);
             return -ENOSPC;
@@ -370,7 +374,7 @@ static long s5_alloc_block(s5fs_t *s5fs)
     }
 
     s5_unlock_super(s5fs);
-    NOT_YET_IMPLEMENTED("S5FS: s5_alloc_block");
+    // NOT_YET_IMPLEMENTED("S5FS: s5_alloc_block");
     return s_blknum;
 }
 
@@ -695,28 +699,36 @@ long s5_link(s5_node_t *dir, const char *name, size_t namelen,
              s5_node_t *child)
 {
     KASSERT(kmutex_owns_mutex(&dir->vnode.vn_mobj.mo_mutex));
-    size_t file_pos=0;
+    // size_t file_pos=0;
     // Check if the new entry already exist
-    if(s5_find_dirent(dir,name,namelen,&file_pos)>=0){
+    if(s5_find_dirent(dir,name,namelen,NULL)>=0){
         return -EEXIST;
     }
     // Initialize the new entry
     s5_dirent_t dirent1;
-    // dirent1->s5d_inode=0;
-    // memset(dirent1->s5d_name,0,sizeof(dirent1->s5d_name));
     memcpy(dirent1.s5d_name,name,namelen);
     dirent1.s5d_name[namelen]='\0';
-    dirent1.s5d_inode=child->vnode.vn_len;
+    dirent1.s5d_inode=child->inode.s5_number;
     
     // Increase the linkcount of child
+    dir->inode.s5_linkcount++;
     child->inode.s5_linkcount++;
-    
-    // Write the new directory entry into dir
-    ssize_t write_bytes=s5_write_file(dir,file_pos,(char *)&dirent1,namelen);
-    if(write_bytes<0){
-        child->inode.s5_linkcount--;
-    }
     child->dirtied_inode=1;
+    dir->dirtied_inode=1;
+    // Write the new directory entry into dir
+    // TODO: I guess it writes from vn_len, which is at the end of the file
+    ssize_t write_bytes=s5_write_file(dir,dir->vnode.vn_len,(char *)&dirent1,sizeof(s5_dirent_t));
+    if(write_bytes<0){
+        dir->inode.s5_linkcount--;
+        child->inode.s5_linkcount--;
+        child->dirtied_inode=0;
+        dir->dirtied_inode=0;
+        return write_bytes;
+    }
+    
+    long ino=s5_find_dirent(dir,name,namelen,NULL); // Check the directory entry
+    KASSERT(ino>=0); // The directory entry exist
+    KASSERT(ino==child->inode.s5_number); // Its inode number is equal to the child
     // NOT_YET_IMPLEMENTED("S5FS: s5_link");
     return 0;
 }
