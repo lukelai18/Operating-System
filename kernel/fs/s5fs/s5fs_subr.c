@@ -357,19 +357,21 @@ static long s5_alloc_block(s5fs_t *s5fs)
     s5_super_t *s=&s5fs->s5f_super;
     
     uint32_t s_blknum=0;
-    // If there are no more free blocks
+    // If the number of blocks in free list is 0
     if(s->s5s_nfree==0){ 
-        s_blknum=s->s5s_free_blocks[S5_NBLKS_PER_FNODE-1]; // Get the next available block number
-        if(s_blknum==(uint32_t)-1){ 
+        s_blknum=s->s5s_free_blocks[S5_NBLKS_PER_FNODE-1]; // Get the first node of the free block list
+        if(s_blknum==(uint32_t)-1){     // If there are no more free blocks
             s5_unlock_super(s5fs);
             return -ENOSPC;
         }
         pframe_t *p;
         s5_get_disk_block(s5fs,s_blknum,1,&p);
+        // memset((uint32_t *)p->pf_addr,0,sizeof(s->s5s_free_blocks)); // Initialize the block content to be 0
         memcpy(s->s5s_free_blocks,(uint32_t *)p->pf_addr,sizeof(s->s5s_free_blocks));
-        s->s5s_nfree+=S5_NBLKS_PER_FNODE-1;
+        s->s5s_nfree=S5_NBLKS_PER_FNODE-1;
     } else{
         s_blknum=s->s5s_free_blocks[(s->s5s_nfree)-1];
+        // memset(s->s5s_free_blocks,0,sizeof(s->s5s_free_blocks)); // Initialize the block content to be 0
         s->s5s_nfree--;
     }
 
@@ -577,8 +579,10 @@ long s5_find_dirent(s5_node_t *sn, const char *name, size_t namelen,
 
         KASSERT(read_bytes==sizeof(s5_dirent_t));
 
-        if(read_bytes<=0){  // Error message
+        if(read_bytes<0){  // Error message
             return read_bytes;
+        } else if(read_bytes==0) {
+            break;
         }
         if(name_match(dir.s5d_name,name,namelen)){
             if(filepos!=NULL)   {*filepos=pos;}
@@ -622,6 +626,7 @@ void s5_remove_dirent(s5_node_t *sn, const char *name, size_t namelen,
     size_t dirent_size=sizeof(s5_dirent_t);
     long ino_num=s5_find_dirent(sn,name,namelen,&file_pos);
     
+    KASSERT(S_ISDIR(sn->vnode.vn_mode)&&"Assert the directory exist"); 
     KASSERT(ino_num>0&&"It should have a valid inode number");
     KASSERT(ino_num==child->inode.s5_number&&"The found directory entry corresponds to child");
 
@@ -629,10 +634,12 @@ void s5_remove_dirent(s5_node_t *sn, const char *name, size_t namelen,
     if(file_pos+dirent_size<dir->vn_len){
         // Read from the last entry of file firstly
         s5_dirent_t last_direntry; // The last entry of file
-        last_direntry.s5d_inode=0;
-        memset(last_direntry.s5d_name,0,sizeof(last_direntry.s5d_name));
+        
+        // Initialize the last directory entry
         ssize_t read_size=s5_read_file(sn,dir->vn_len-dirent_size,(char *)&last_direntry,dirent_size);
         KASSERT(read_size==(ssize_t)dirent_size&&"Make sure that we read the entire last directory entry");
+
+        // Write the initialized last entry to the corresponding file position
         ssize_t write_size=s5_write_file(sn,file_pos,(char *)&last_direntry,dirent_size);
         KASSERT(write_size==read_size && "Make sure the write size and read size are the same");
     }
@@ -641,7 +648,9 @@ void s5_remove_dirent(s5_node_t *sn, const char *name, size_t namelen,
     dir->vn_len-=dirent_size;
     sn->inode.s5_un.s5_size=dir->vn_len;
     sn->dirtied_inode=1;
-
+    sn->inode.s5_linkcount--;
+    // TODO: Do we need to decrease the refcount of parent dir
+    
     // Reduce the refcount of child
     child->inode.s5_linkcount--;
     child->dirtied_inode=1;

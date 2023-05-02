@@ -655,7 +655,8 @@ static long s5fs_mkdir(vnode_t *dir, const char *name, size_t namelen,
     }
     long tmp2=s5_link(par_node,doubleDot,2,chl_node); // Parent directory and child directory
     if(tmp2<0){
-        s5fs_unlink(chl_vnode,dot,1); // Undo the previous steps
+        // TODO: How to undo s5_link
+        // s5fs_unlink(chl_vnode,dot,1); // Undo the previous steps
         vput_locked(&chl_vnode);
         s5_free_inode(s5,ino);
         return tmp2;
@@ -664,8 +665,8 @@ static long s5fs_mkdir(vnode_t *dir, const char *name, size_t namelen,
     KASSERT(chl_node->inode.s5_linkcount==2); // Assert its linkcount is correct
     long tmp3=s5_link(par_node,name,namelen,chl_node); // Create name/namelen entry
     if(tmp3<0){
-        s5fs_unlink(chl_vnode,dot,1);
-        s5fs_unlink(dir,doubleDot,2);
+        // s5fs_unlink(chl_vnode,dot,1);
+        // s5fs_unlink(dir,doubleDot,2);
         vput_locked(&chl_vnode);
         s5_free_inode(s5,ino);
         return tmp3;
