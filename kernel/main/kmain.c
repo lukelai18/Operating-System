@@ -45,6 +45,7 @@ GDB_DEFINE_HOOK(shutdown)
 
 static void initproc_start();
 int vfstest_main(int argc, char **argv);
+int s5fstest_main();
 
 typedef void (*init_func_t)();
 static init_func_t init_funcs[] = {
@@ -167,6 +168,7 @@ static void *initproc_run(long arg1, void *arg2)
     make_devices();
 #endif
 vfstest_main(1,NULL);
+s5fstest_main();
 /* To create a kshell on each terminal */
 #ifdef __DRIVERS__
     char name[32] = {0};

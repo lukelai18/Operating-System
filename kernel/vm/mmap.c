@@ -51,6 +51,11 @@
  * 
  *  If you are mapping less than a page, make sure that you are still allocating 
  *  a full page. 
+ * We wanted to clarify a note in the stencil for do_mmap.  
+ * In do_mmap, in addition to the errors specified in the stencil comments, you also
+ * need to handle the case where MAP_FIXED is specified, and the address is out of range (EINVAL). 
+ * Refer to the man pages for confusion with error handling.
+ * You do not need to handle the case for -EACESS when the file is non-regular.
  */
 long do_mmap(void *addr, size_t len, int prot, int flags, int fd, off_t off,
              void **ret)

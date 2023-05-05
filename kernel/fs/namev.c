@@ -79,6 +79,12 @@ long namev_lookup(vnode_t *dir, const char *name, size_t namelen,
     if(!S_ISDIR(dir->vn_mode)){  // If dir is not a directory
         return -ENOTDIR;
     }
+    if (!namelen) {
+        // special case-ing looking up the root directory
+        vref(dir);
+        *res_vnode = dir;
+        return 0;
+    }
     long tmp=dir->vn_ops->lookup(dir,name,namelen,res_vnode);
     // NOT_YET_IMPLEMENTED("VFS: namev_lookup");
     return tmp;
@@ -272,17 +278,21 @@ long namev_open(vnode_t *base, const char *path, int oflags, int mode,
     }
     vlock(parent_vnode);
     long tmp2=namev_lookup(parent_vnode,name,namelen,res_vnode); // Obtain the desired vnode and increment the reference
-    vunlock(parent_vnode);
+    //vunlock(parent_vnode);
     // If lookup succeed, now the res_vnode is the directory we would like to open  
     if(tmp2!=-ENOTDIR&&tmp2<0 && (oflags&O_CREAT)){ // If namev_lookup() fails and O_CREAT is specified in oflags
-        parent_vnode->vn_ops->mknod(parent_vnode,name,namelen,mode,devid,res_vnode); // Will add ref for vnode
-        vput(&parent_vnode);
+        long ret =parent_vnode->vn_ops->mknod(parent_vnode,name,namelen,mode,devid,res_vnode); // Will add ref for vnode
+        if(ret<0){
+            vput_locked(&parent_vnode);
+            return ret;
+        }
+        vput_locked(&parent_vnode);
     }
     else if(tmp2<0)  { // If there exsit other issues
-        vput(&parent_vnode);
+        vput_locked(&parent_vnode);
         return tmp2;
     } else {
-        vput(&parent_vnode);
+        vput_locked(&parent_vnode);
     }
     // TODO: ramfs_mknod()
     //ssize_t tmp3=ramfs_mknod(parent_vnode,name,namelen,mode,devid,res_vnode);

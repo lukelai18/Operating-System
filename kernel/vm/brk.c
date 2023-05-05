@@ -47,6 +47,10 @@
  *    user/libc/syscall.c if you're curious.
  * 3) Return 0 on success, -errno on failure through the 'ret' argument.
  *
+ * In do_brk, the stencil comments say, "3) Return 0 on success, -errno 
+ * on failure through the ret argument." There is no need to set ret; you
+ *  just need to return the error. The ret argument instead should be used 
+ * to return the updated p_brk on success. 
  * Error cases do_brk is responsible for generating:
  *  - ENOMEM: attempting to set p_brk beyond its valid range
  */

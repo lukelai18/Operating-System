@@ -175,6 +175,9 @@ long do_mknod(const char *path, int mode, devid_t devid)
     }
     vnode_t *res_vnode; 
     long tmp=namev_open(curproc->p_cwd,path,O_CREAT,mode,devid,&res_vnode); // Create the file
+    if (tmp < 0) {
+        return tmp;
+    }
     vput(&res_vnode);   // The newly created vnode should have no references
     // NOT_YET_IMPLEMENTED("VFS: do_mknod");
     return tmp;
@@ -515,7 +518,9 @@ ssize_t do_getdent(int fd, struct dirent *dirp)
         return -ENOTDIR;
     }
     file_t *tmp_file=fget(fd);
+    vlock(curproc->p_files[fd]->f_vnode);
     ssize_t tmp=curproc->p_files[fd]->f_vnode->vn_ops->readdir(curproc->p_files[fd]->f_vnode,curproc->p_files[fd]->f_pos,dirp);
+    vunlock(curproc->p_files[fd]->f_vnode);
     curproc->p_files[fd]->f_pos+=tmp; // Update file position
     fput(&tmp_file);
     //NOT_YET_IMPLEMENTED("VFS: do_getdent");
