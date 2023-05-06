@@ -432,9 +432,13 @@ long s5fs_lookup(vnode_t *dir, const char *name, size_t namelen,
     s5_node_t *s5node=VNODE_TO_S5NODE(dir);
     long find_ino=s5_find_dirent(s5node,name,namelen,NULL);
     if(find_ino<0)  {return find_ino;}
-    *ret=vget(dir->vn_fs,find_ino);
+    if(VNODE_TO_S5NODE(dir)->inode.s5_number==find_ino)   {
+        vref(dir);
+        *ret=dir;
+    } else {
+        *ret=vget(dir->vn_fs,find_ino);
+    }
     // TODO: Not sure, because the refcount of ret has been increased in vget
-    if(*ret==dir)   {vref(dir);}
     // NOT_YET_IMPLEMENTED("S5FS: s5fs_lookup");
     return 0;
 }

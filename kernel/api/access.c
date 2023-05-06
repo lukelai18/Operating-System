@@ -116,7 +116,22 @@ long user_vecdup(argvec_t *uvec, char ***kvecp)
  */
 long addr_perm(proc_t *p, const void *vaddr, int perm)
 {
-    NOT_YET_IMPLEMENTED("VM: addr_perm");
+    vmarea_t *cur_vma=vmmap_lookup(p->p_vmmap,ADDR_TO_PN(vaddr));
+    if(cur_vma==NULL){  // Error checking
+        return 0;
+    }
+
+    // Check page protection flags, read, write and execute
+    if((perm&PROT_EXEC)&&(cur_vma->vma_prot&PROT_EXEC)){
+        return 1;
+    }
+    if((perm&PROT_READ)&&(cur_vma->vma_prot&PROT_READ)){
+        return 1;
+    }
+    if((perm&PROT_WRITE)&&(cur_vma->vma_prot&PROT_WRITE)){
+        return 1;
+    }
+    // NOT_YET_IMPLEMENTED("VM: addr_perm");
     return 0;
 }
 
@@ -131,6 +146,13 @@ long addr_perm(proc_t *p, const void *vaddr, int perm)
  */
 long range_perm(proc_t *p, const void *vaddr, size_t len, int perm)
 {
+    void *cur_vaddr=vaddr;
+    void *end_vaddr=vaddr+len;
+    if(len<PAGE_SIZE){
+
+    }else{
+        
+    }
     NOT_YET_IMPLEMENTED("VM: range_perm");
     return 0;
 }

@@ -27,7 +27,9 @@ static mobj_ops_t anon_mobj_ops = {.get_pframe = NULL,
  */
 void anon_init()
 {
-    NOT_YET_IMPLEMENTED("VM: anon_init");
+    anon_allocator=slab_allocator_create("anon",sizeof(mobj_t));
+    KASSERT(anon_allocator);
+    // NOT_YET_IMPLEMENTED("VM: anon_init");
 }
 
 /*
@@ -36,8 +38,15 @@ void anon_init()
  */
 mobj_t *anon_create()
 {
-    NOT_YET_IMPLEMENTED("VM: anon_create");
-    return NULL;
+    mobj_t *new_anon=slab_obj_alloc(anon_allocator);
+
+    if(new_anon==NULL){
+        return NULL;
+    }
+    mobj_init(new_anon,MOBJ_ANON,&anon_mobj_ops);
+    mobj_lock(new_anon);
+    // NOT_YET_IMPLEMENTED("VM: anon_create");
+    return new_anon;
 }
 
 /* 
@@ -46,7 +55,8 @@ mobj_t *anon_create()
  */
 static long anon_fill_pframe(mobj_t *o, pframe_t *pf)
 {
-    NOT_YET_IMPLEMENTED("VM: annon_fill_pframe");
+    memset(pf->pf_addr,0,PAGE_SIZE);
+    // NOT_YET_IMPLEMENTED("VM: annon_fill_pframe");
     return 0;
 }
 
@@ -61,5 +71,8 @@ static long anon_flush_pframe(mobj_t *o, pframe_t *pf) { return 0; }
  */
 static void anon_destructor(mobj_t *o)
 {
-    NOT_YET_IMPLEMENTED("VM: anon_destructor");
+    mobj_default_destructor(o);
+    mobj_put(&o);
+    // TODO: Not sure how to free
+    // NOT_YET_IMPLEMENTED("VM: anon_destructor");
 }

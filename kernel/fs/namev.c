@@ -302,7 +302,6 @@ long namev_open(vnode_t *base, const char *path, int oflags, int mode,
         return -ENOTDIR; // If attempting to open a regular file as a directory
     }
     // NOT_YET_IMPLEMENTED("VFS: namev_open"); 
-
     return 0;
 }
 

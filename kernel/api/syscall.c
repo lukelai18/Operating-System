@@ -69,8 +69,32 @@ void syscall_init(void) { intr_register(INTR_SYSCALL, syscall_handler); }
  */
 static long sys_read(read_args_t *args)
 {
-    NOT_YET_IMPLEMENTED("VM: sys_read");
-    return -1;
+    read_args_t kernel_args;
+    long ret1=copy_from_user(&kernel_args,args,sizeof(read_args_t));     // Copy from userland args
+    ERROR_OUT_RET(ret1);
+
+    // Allocate a temp buffer
+    char* buf=(char *)page_alloc();
+    if(buf==NULL){
+        curthr->kt_errno=ENOMEM;
+        return -1;
+    }
+
+    // Copy the buffer to the userland args after the system call
+    ssize_t read_bytes=do_read(kernel_args.fd,buf,kernel_args.nbytes);
+    if(read_bytes<0){   // Error checking
+        page_free(buf);
+        ERROR_OUT_RET(read_bytes);      
+        // return -1;
+    }
+    // Copy to userland args after syscall
+    // TODO: 
+    long ret2=copy_to_user((char *)args->buf,buf,read_bytes);
+    ERROR_OUT_RET(ret2);
+    
+    page_free(buf);
+    // NOT_YET_IMPLEMENTED("VM: sys_read");
+    return read_bytes;
 }
 
 /*
@@ -84,8 +108,35 @@ static long sys_read(read_args_t *args)
  */
 static long sys_write(write_args_t *args)
 {
-    NOT_YET_IMPLEMENTED("VM: sys_write");
-    return -1;
+    write_args_t kernel_args;
+    long ret1=copy_from_user(&kernel_args,args,sizeof(write_args_t));     // Copy from userland args
+    ERROR_OUT_RET(ret1);
+    
+    // Allocate a temp buffer
+    char* buf=(char *)page_alloc();
+    if(buf==NULL){
+        curthr->kt_errno=ENOMEM;
+        return -1;
+    }
+
+    // Copy from the kernel's buf into temp buf
+    long ret2=copy_from_user(buf,kernel_args.buf,kernel_args.nbytes);
+    if(ret2<0){
+        page_free(buf);
+        ERROR_OUT_RET(ret2);
+    }
+    
+    // Write nbytes from buf into file represented by fd
+    ssize_t write_bytes=do_write(kernel_args.fd,buf,kernel_args.nbytes);
+    if(write_bytes<0){   // Error checking
+        page_free(buf);
+        ERROR_OUT_RET(write_bytes);      
+        // return -1;
+    }
+
+    page_free(buf);
+    // NOT_YET_IMPLEMENTED("VM: sys_write");
+    return write_bytes;
 }
 
 /*
@@ -100,8 +151,33 @@ static long sys_write(write_args_t *args)
  */
 static long sys_getdents(getdents_args_t *args)
 {
-    NOT_YET_IMPLEMENTED("VM: sys_getdents");
-    return -1;
+    getdents_args_t kernel_args;
+    // Copy userland arg into kernel arg
+    long ret1=copy_from_user(&kernel_args,args,sizeof(getdents_args_t));     // Copy from userland args
+    ERROR_OUT_RET(ret1);
+
+    size_t count_size=kernel_args.count/sizeof(dirent_t);
+    // At least one size of dirent_t
+    if(count_size<1){
+        return 0;
+    }    
+    
+    dirent_t dirp;
+    ssize_t total_read_bytes=0;
+
+    // TODO: Not sure copy_to_user
+    while(count_size){
+        ssize_t read_bytes=do_getdent(kernel_args.fd,&dirp);
+        ERROR_OUT_RET(read_bytes);
+
+        long ret2=copy_to_user((args.dirp+total_read_bytes),&dirp,read_bytes);
+        ERROR_OUT_RET(ret2);
+
+        total_read_bytes+=read_bytes;
+        count_size--;
+    }
+    // NOT_YET_IMPLEMENTED("VM: sys_getdents");
+    return total_read_bytes;
 }
 
 #ifdef __MOUNTING__

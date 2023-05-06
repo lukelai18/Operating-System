@@ -178,7 +178,7 @@ long s5_file_block_to_disk_block(s5_node_t *sn, size_t file_blocknum,
                         return new_disk_blocknum;
                     }
                     ((uint32_t *)pf->pf_addr)[indir_offset]=new_disk_blocknum;
-                    desired_blocknum=new_indirect_blocknum;
+                    desired_blocknum=new_disk_blocknum;
                 }
                 s5_release_disk_block(&pf);
                 return desired_blocknum;
@@ -190,7 +190,6 @@ long s5_file_block_to_disk_block(s5_node_t *sn, size_t file_blocknum,
             pframe_t *pf;
             s5_get_disk_block(s5, sn->inode.s5_indirect_block, 1, &pf);
 
-            //sn->inode.s
             if(alloc){
                 if(((uint32_t *)pf->pf_addr)[indir_offset]>0){ // If the disk number is greater than 0
                     uint32_t disk_blocknum=((uint32_t *)pf->pf_addr)[indir_offset];
@@ -770,8 +769,6 @@ long s5_link(s5_node_t *dir, const char *name, size_t namelen,
     dirent1.s5d_name[namelen]='\0';
     dirent1.s5d_inode=child->inode.s5_number;
     
-    // Increase the linkcount of child
-   
     // Write the new directory entry into dir
     // TODO: I guess it writes from vn_len, which is at the end of the file
     ssize_t write_bytes=s5_write_file(dir,dir->vnode.vn_len,(char *)&dirent1,sizeof(s5_dirent_t));
@@ -779,7 +776,7 @@ long s5_link(s5_node_t *dir, const char *name, size_t namelen,
         return write_bytes;
     }
 
-    // Not sure about the linkcount here
+    // Increase the linkcount of child
     child->inode.s5_linkcount++;
     child->dirtied_inode=1;
     

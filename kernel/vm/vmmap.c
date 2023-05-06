@@ -402,6 +402,8 @@ long vmmap_remove(vmmap_t *map, size_t lopage, size_t npages)
     vmarea_t *cur_vmarea;
     int case_type=0;    // Consider the listed case type
     size_t end_page=lopage+npages;
+    
+    // TODO: Do need to clean TLB and pagetables when there are no mappings
     list_iterate(&map->vmm_list,cur_vmarea,vmarea_t,vma_plink){
         if(cur_vmarea->vma_start<=lopage&&cur_vmarea->vma_end>=end_page){   // Case 1
             vmarea_t *new_vmarea=vmarea_alloc();
@@ -420,6 +422,8 @@ long vmmap_remove(vmmap_t *map, size_t lopage, size_t npages)
             }
 
             cur_vmarea->vma_end=lopage; // Set the new end of current vmarea, so that we can split the previous vmarea
+            pt_unmap_range(curproc->p_pml4,(uintptr_t)PN_TO_ADDR(lopage),(uintptr_t)PN_TO_ADDR(lopage+npages));
+            tlb_flush_range((uintptr_t)PN_TO_ADDR(lopage),npages);
 
             vmmap_insert(map,new_vmarea);  // Insert it into the map list 
         } else if(cur_vmarea->vma_end>lopage&&cur_vmarea->vma_end<=end_page&&cur_vmarea->vma_start<lopage){  // Case 2
@@ -438,7 +442,7 @@ long vmmap_remove(vmmap_t *map, size_t lopage, size_t npages)
         }
     }
 
-    NOT_YET_IMPLEMENTED("VM: vmmap_remove");
+    // NOT_YET_IMPLEMENTED("VM: vmmap_remove");
     return 0;
 }
 
@@ -484,7 +488,65 @@ long vmmap_is_range_empty(vmmap_t *map, size_t startvfn, size_t npages)
  */
 long vmmap_read(vmmap_t *map, const void *vaddr, void *buf, size_t count)
 {
-    NOT_YET_IMPLEMENTED("VM: vmmap_read");
+    KASSERT(map!=NULL&&"Assume map is not NULL");
+    KASSERT(vaddr!=NULL&&"Should be a valid address");
+    KASSERT(buf!=NULL&&"Should be a valid buf");
+
+    if(count==0){
+        return 0;
+    }
+
+    size_t cur_read_bytes=0;
+    const void* cur_vaddr=vaddr; // Initialize current address
+
+    while(cur_read_bytes<count){
+        size_t start_page=ADDR_TO_PN(cur_vaddr);
+        vmarea_t *cur_vma=vmmap_lookup(map,start_page);
+        KASSERT(cur_vma!=NULL&&"Assert current vmarea is not NULL");
+
+        // To make sure it won't read beyond the vmarea
+        size_t aligned_bytes=PAGE_ALIGN_UP(count-cur_read_bytes);
+        size_t needed_pagenum=ADDR_TO_PN(aligned_bytes);
+
+        // Get the number of page numbers to be read in this loop
+        if(needed_pagenum>cur_vma->vma_end-start_page){
+            needed_pagenum=cur_vma->vma_end-start_page;     // Can not beyond current vmarea
+        }
+
+        // Update the latest offset of the vmarea
+        size_t cur_off=start_page-cur_vma->vma_start+cur_vma->vma_off;
+
+        // Begin to read page by page
+        for(size_t i=0;i<needed_pagenum;i++){
+            // Obtain this page frame
+            pframe_t *pf;
+            long tmp=mobj_get_pframe(cur_vma->vma_obj,cur_off+i,0,&pf);
+            if(tmp<0){
+                return tmp;
+            }
+
+            size_t page_offset=(size_t)cur_vaddr%PAGE_SIZE;  // Get the start position in this page
+            size_t this_page_read_bytes=0;
+            // If the data we need to read didn't reach the end of the page
+            if(PAGE_SIZE-page_offset<=count-cur_read_bytes){
+                this_page_read_bytes=PAGE_SIZE-page_offset;
+            }  else{
+                this_page_read_bytes=count-cur_read_bytes;
+            }
+
+            // Copy the data in this page into buf
+            memcpy((char *)buf,(char *)pf->pf_addr+page_offset,this_page_read_bytes);
+
+            // Update the variables
+            cur_read_bytes+=this_page_read_bytes;
+            buf=(char *)buf+cur_read_bytes;
+            cur_vaddr=(char *)cur_vaddr+this_page_read_bytes;
+            
+            kmutex_unlock(&pf->pf_mutex);
+        }
+    }
+
+    // NOT_YET_IMPLEMENTED("VM: vmmap_read");
     return 0;
 }
 
@@ -506,7 +568,67 @@ long vmmap_read(vmmap_t *map, const void *vaddr, void *buf, size_t count)
  */
 long vmmap_write(vmmap_t *map, void *vaddr, const void *buf, size_t count)
 {
-    NOT_YET_IMPLEMENTED("VM: vmmap_write");
+    KASSERT(map!=NULL&&"Assume map is not NULL");
+    KASSERT(vaddr!=NULL&&"Should be a valid address");
+    KASSERT(buf!=NULL&&"Should be a valid buf");
+
+    if(count==0){
+        return 0;
+    }
+
+    size_t cur_write_bytes=0;
+    const void* cur_vaddr=vaddr; // Initialize current address
+
+    while(cur_write_bytes<count){
+        size_t start_page=ADDR_TO_PN(cur_vaddr);
+        vmarea_t *cur_vma=vmmap_lookup(map,start_page);
+        KASSERT(cur_vma!=NULL&&"Assert current vmarea is not NULL");
+
+        // To make sure it won't write beyond the vmarea
+        size_t aligned_bytes=PAGE_ALIGN_UP(count-cur_write_bytes);
+        size_t needed_pagenum=ADDR_TO_PN(aligned_bytes);
+
+        // Get the number of page numbers to be write in this loop
+        if(needed_pagenum>cur_vma->vma_end-start_page){
+            needed_pagenum=cur_vma->vma_end-start_page;     // Can not beyond current vmarea
+        }
+
+        // Update the latest offset of the vmarea
+        size_t cur_off=start_page-cur_vma->vma_start+cur_vma->vma_off;
+
+        // Begin to write page by page
+        for(size_t i=0;i<needed_pagenum;i++){
+            // Obtain this page frame
+            pframe_t *pf;
+            long tmp=mobj_get_pframe(cur_vma->vma_obj,cur_off+i,0,&pf);
+            if(tmp<0){
+                return tmp;
+            }
+            
+            size_t page_offset=(size_t)cur_vaddr%PAGE_SIZE;  // Get the start position in this page
+            size_t this_page_write_bytes=0;
+            // If the data we need to write didn't reach the end of the page
+            if(PAGE_SIZE-page_offset<=count-cur_write_bytes){
+                this_page_write_bytes=PAGE_SIZE-page_offset;
+            }  else{
+                this_page_write_bytes=count-cur_write_bytes;
+            }
+
+            // Copy the data from buf into this page
+            memcpy((char *)pf->pf_addr+page_offset,(char *)buf,this_page_write_bytes);
+
+            pf->pf_dirty=1; // Mark the page frame as dirtied
+            
+            // Update the variables
+            cur_write_bytes+=this_page_write_bytes;
+            buf=(char *)buf+cur_write_bytes;
+            cur_vaddr=(char *)cur_vaddr+this_page_write_bytes;
+            
+            kmutex_unlock(&pf->pf_mutex);
+        }
+
+    }
+    // NOT_YET_IMPLEMENTED("VM: vmmap_write");
     return 0;
 }
 

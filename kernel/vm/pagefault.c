@@ -49,5 +49,50 @@ void handle_pagefault(uintptr_t vaddr, uintptr_t cause)
 {
     dbg(DBG_VM, "vaddr = 0x%p (0x%p), cause = %lu\n", (void *)vaddr,
         PAGE_ALIGN_DOWN(vaddr), cause);
-    NOT_YET_IMPLEMENTED("VM: handle_pagefault");
+
+    vmarea_t *fault_vmarea=vmmap_lookup(curproc->p_vmmap,ADDR_TO_PN(vaddr));
+    if(fault_vmarea==NULL){
+        do_exit(EFAULT);    // Exit
+    }
+
+    KASSERT((cause&FAULT_USER)&&"Assert fault user is always set");
+    // Doesn't have Read Permission
+    if(!(cause&FAULT_WRITE)&&!(cause&FAULT_EXEC)&&!(fault_vmarea->vma_prot&PROT_READ)){      // Attempt to read, but failed
+        do_exit(EFAULT);
+    }
+    // Doesn't have EXEC permission 
+    if((cause&FAULT_EXEC)&&!(fault_vmarea->vma_prot&PROT_EXEC)){
+        do_exit(EFAULT);
+    }
+    // Doesn't have WRITE permission
+    if((cause&FAULT_WRITE)&&!(fault_vmarea->vma_prot&PROT_WRITE)){
+        do_exit(EFAULT);
+    }
+    // Doesn't have any permission
+    if(fault_vmarea->vma_prot&PROT_NONE){
+        do_exit(EFAULT);
+    }
+    pframe_t *pf;
+    // TODO: Check the vaddr
+    long tmp=mobj_get_pframe(fault_vmarea->vma_obj,ADDR_TO_PN(vaddr),cause&FAULT_WRITE,&pf);
+    if(tmp<0){
+        do_exit(EFAULT);
+    }
+
+    int pdflags=PT_PRESENT | PT_WRITE | PT_USER;
+    int ptflags=PT_PRESENT | PT_USER;
+    if(cause&FAULT_WRITE){
+        ptflags=ptflags|PT_WRITE;
+    }
+    uintptr_t phy_addr= pt_virt_to_phys(vaddr);
+    long tmp2=pt_map(curproc->p_pml4,phy_addr,PAGE_ALIGN_DOWN(vaddr),pdflags,ptflags);
+    if(tmp<0){
+        kmutex_unlock(&pf->pf_mutex);
+        do_exit(EFAULT);
+    }
+
+    // Flush the tlb
+    tlb_flush_all();
+    kmutex_unlock(&pf->pf_mutex);
+    // NOT_YET_IMPLEMENTED("VM: handle_pagefault");
 }

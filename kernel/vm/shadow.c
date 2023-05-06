@@ -41,7 +41,9 @@ static mobj_ops_t shadow_mobj_ops = {.get_pframe = shadow_get_pframe,
  */
 void shadow_init()
 {
-    NOT_YET_IMPLEMENTED("VM: shadow_init");
+    shadow_allocator=slab_allocator_create("shadow",sizeof(mobj_shadow_t));
+    KASSERT(shadow_allocator);
+    // NOT_YET_IMPLEMENTED("VM: shadow_init");
 }
 
 /*
