@@ -74,7 +74,8 @@ static long sys_read(read_args_t *args)
     ERROR_OUT_RET(ret1);
 
     // Allocate a temp buffer
-    char* buf=(char *)page_alloc();
+    uintptr_t npages=kernel_args.nbytes/PAGE_SIZE+1;
+    char* buf=(char *)page_alloc_n(npages);
     if(buf==NULL){
         curthr->kt_errno=ENOMEM;
         return -1;
@@ -83,7 +84,7 @@ static long sys_read(read_args_t *args)
     // Copy the buffer to the userland args after the system call
     ssize_t read_bytes=do_read(kernel_args.fd,buf,kernel_args.nbytes);
     if(read_bytes<0){   // Error checking
-        page_free(buf);
+        page_free_n(buf,npages);
         ERROR_OUT_RET(read_bytes);      
         // return -1;
     }
@@ -92,7 +93,7 @@ static long sys_read(read_args_t *args)
     long ret2=copy_to_user((char *)args->buf,buf,read_bytes);
     ERROR_OUT_RET(ret2);
     
-    page_free(buf);
+    page_free_n(buf,npages);
     // NOT_YET_IMPLEMENTED("VM: sys_read");
     return read_bytes;
 }
@@ -113,7 +114,8 @@ static long sys_write(write_args_t *args)
     ERROR_OUT_RET(ret1);
     
     // Allocate a temp buffer
-    char* buf=(char *)page_alloc();
+    uintptr_t npages=kernel_args.nbytes/PAGE_SIZE+1;
+    char* buf=(char *)page_alloc_n(npages);
     if(buf==NULL){
         curthr->kt_errno=ENOMEM;
         return -1;
@@ -122,19 +124,19 @@ static long sys_write(write_args_t *args)
     // Copy from the kernel's buf into temp buf
     long ret2=copy_from_user(buf,kernel_args.buf,kernel_args.nbytes);
     if(ret2<0){
-        page_free(buf);
+        page_free_n(buf,npages);
         ERROR_OUT_RET(ret2);
     }
     
     // Write nbytes from buf into file represented by fd
     ssize_t write_bytes=do_write(kernel_args.fd,buf,kernel_args.nbytes);
     if(write_bytes<0){   // Error checking
-        page_free(buf);
+        page_free_n(buf,npages);
         ERROR_OUT_RET(write_bytes);      
         // return -1;
     }
 
-    page_free(buf);
+    page_free_n(buf,npages);
     // NOT_YET_IMPLEMENTED("VM: sys_write");
     return write_bytes;
 }
@@ -170,7 +172,7 @@ static long sys_getdents(getdents_args_t *args)
         ssize_t read_bytes=do_getdent(kernel_args.fd,&dirp);
         ERROR_OUT_RET(read_bytes);
 
-        long ret2=copy_to_user((args.dirp+total_read_bytes),&dirp,read_bytes);
+        long ret2=copy_to_user((args->dirp+total_read_bytes),&dirp,read_bytes);
         ERROR_OUT_RET(ret2);
 
         total_read_bytes+=read_bytes;

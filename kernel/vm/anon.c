@@ -72,7 +72,8 @@ static long anon_flush_pframe(mobj_t *o, pframe_t *pf) { return 0; }
 static void anon_destructor(mobj_t *o)
 {
     mobj_default_destructor(o);
-    mobj_put(&o);
+    slab_obj_free(anon_allocator,o);
+    // mobj_put(&o);
     // TODO: Not sure how to free
     // NOT_YET_IMPLEMENTED("VM: anon_destructor");
 }

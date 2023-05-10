@@ -121,18 +121,20 @@ long addr_perm(proc_t *p, const void *vaddr, int perm)
         return 0;
     }
 
-    // Check page protection flags, read, write and execute
-    if((perm&PROT_EXEC)&&(cur_vma->vma_prot&PROT_EXEC)){
-        return 1;
-    }
-    if((perm&PROT_READ)&&(cur_vma->vma_prot&PROT_READ)){
-        return 1;
-    }
-    if((perm&PROT_WRITE)&&(cur_vma->vma_prot&PROT_WRITE)){
-        return 1;
-    }
-    // NOT_YET_IMPLEMENTED("VM: addr_perm");
-    return 0;
+    return ((vma->vma_prot & perm) == perm);
+
+    // // Check page protection flags, read, write and execute
+    // if((perm&PROT_EXEC)&&(cur_vma->vma_prot&PROT_EXEC)){
+    //     return 1;
+    // }
+    // if((perm&PROT_READ)&&(cur_vma->vma_prot&PROT_READ)){
+    //     return 1;
+    // }
+    // if((perm&PROT_WRITE)&&(cur_vma->vma_prot&PROT_WRITE)){
+    //     return 1;
+    // }
+    // // NOT_YET_IMPLEMENTED("VM: addr_perm");
+    // return 0;
 }
 
 /*
@@ -146,13 +148,34 @@ long addr_perm(proc_t *p, const void *vaddr, int perm)
  */
 long range_perm(proc_t *p, const void *vaddr, size_t len, int perm)
 {
-    void *cur_vaddr=vaddr;
-    void *end_vaddr=vaddr+len;
-    if(len<PAGE_SIZE){
-
-    }else{
-        
+    if(len==0){
+        return 0;
     }
-    NOT_YET_IMPLEMENTED("VM: range_perm");
-    return 0;
+    // size_t cur_vaddr=(size_t)vaddr;
+    // size_t end_vaddr=(size_t)vaddr+len;
+
+    size_t start_pagenum=(size_t)ADDR_TO_PN(vaddr);
+    size_t end_pagenum=(size_t)ADDR_TO_PN(vaddr+len-1);
+
+    for(size_t i=start_pagenum;i<=end_pagenum;i++){
+        if(!addr_perm(p,PN_TO_ADDR(i),perm)){
+            return 0;
+        }
+    }
+
+    // while(cur_vaddr<end_vaddr){
+    //     if(!addr_perm(p,(void *)cur_vaddr,perm)){
+    //         return 0;
+    //     }
+    //     // Update current virtual address
+    //     // TODO: Need to come back，not sure how to consider the case when the rest range is less than 1 PAGE_SIZE
+    //     if(end_vaddr-cur_vaddr<PAGE_SIZE){  // If the rest of searching range is less than 1 SIZE
+    //         cur_vaddr=end_vaddr;
+    //     }else{
+    //         cur_vaddr=cur_vaddr+PAGE_SIZE;  
+    //     }
+    // }
+
+    // NOT_YET_IMPLEMENTED("VM: range_perm");
+    return 1;
 }

@@ -57,6 +57,33 @@ static uintptr_t fork_setup_stack(const regs_t *regs, void *kstack)
  */
 long do_fork(struct regs *regs)
 {
+    proc_t* child_proc=proc_create("new_process");
+
+    if(child_proc==NULL){
+        curthr->kt_errno=ENOMEM;
+        return -1;
+    }
+  
+    kthread_t *new_thr=kthread_clone(curthr);
+    if(new_thr==NULL){
+        proc_destroy(child_proc);    
+        curthr->kt_errno=ENOMEM;
+        return -1;
+    }
+    list_insert_tail(&child_proc->p_threads,&new_thr->kt_plink);
+    new_thr->kt_proc=child_proc;
+    new_thr->kt_state=KT_RUNNABLE;
+    // TODO: Should I set new thread's state
+    regs->r_rax=0;
+
+    // Instruction pointer should point to userland_entry
+    new_thr->kt_ctx.c_kstack=(uintptr_t)new_thr->kt_kstack;
+    new_thr->kt_ctx.c_kstacksz=DEFAULT_STACK_SIZE;
+    new_thr->kt_ctx.c_rip=(uintptr_t)userland_entry;
+    new_thr->kt_ctx.c_rsp=fork_setup_stack(regs,new_thr->kt_kstack);
+    new_thr->kt_ctx.c_pml4=child_proc->p_pml4;
+
+    regs->r_rax=new_proc->p_pid;
     NOT_YET_IMPLEMENTED("VM: do_fork");
     return -1;
 }

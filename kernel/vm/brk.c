@@ -56,6 +56,55 @@
  */
 long do_brk(void *addr, void **ret)
 {
-    NOT_YET_IMPLEMENTED("VM: do_brk");
+    // // If addr is not in valid range 
+    // if((size_t)addr>USER_MEM_HIGH||addr<curproc->p_start_brk){
+    //     return -ENOMEM;
+    // }
+    // // If addr is NULL
+    // if(addr==NULL){
+    //     // *ret=curproc->p_brk;
+    //     return 0;
+    // }
+    // // TODO: How to consider to page align for the start brk
+    
+
+    // // We need to Initialize a new heap
+    // if(curproc->p_brk==curproc->p_start_brk){
+    //     size_t start_pn=ADDR_TO_PN(PAGE_ALIGN_UP(curproc->p_start_brk));
+    //     size_t end_pn=ADDR_TO_PN(PAGE_ALIGN_UP(addr));
+
+    //     if(start_pn!=end_pn){
+    //         vmmap_remove(curproc->p_vmmap,start_pn,end_pn-start_pn);    // Clean up the specified range
+    //     }
+
+    //     curproc->p_brk=addr;
+    //     // TODO: What do I need to do when I want to initialize a heap
+    // }
+
+    // if(addr<curproc->p_brk){
+    //     // The heap this to shrink
+    //     size_t new_end=ADDR_TO_PN(PAGE_ALIGN_UP(addr)); // Get the start page number
+    //     size_t old_end=ADDR_TO_PN(PAGE_ALIGN_UP(curproc->p_brk));    // Get the end page number
+
+    //     // The page number may be the same
+    //     if(new_end!=old_end){
+    //         vmmap_remove(curproc->p_vmmap,new_end,old_end-new_end);    // Clean up the specified range
+    //     }
+    //     curproc->p_brk=addr; // Update the new end of the heap
+    // } else if(addr>curproc->p_brk){
+    //     size_t old_end=ADDR_TO_PN(PAGE_ALIGN_UP(curproc->p_brk));
+    //     size_t new_end=ADDR_TO_PN(PAGE_ALIGN_UP(addr));
+
+    //     if(old_end!=new_end){
+    //         if(!vmmap_is_range_empty(curproc->p_vmmap,old_end,new_end-old_end)){
+    //             return -ENOMEM;     // Beyond its valid range
+    //         }
+    //     }
+
+    //     curproc->p_brk=addr;
+    // }
+    // *ret=curproc->p_brk;
+    // // TODO: Need to come back
+    // NOT_YET_IMPLEMENTED("VM: do_brk");
     return 0;
 }

@@ -70,7 +70,14 @@ kthread_t *kthread_create(proc_t *proc, kthread_func_t func, long arg1,
 {
     kthread_t *new_kth;
     new_kth = slab_obj_alloc(kthread_allocator); // Point to the chunk of memory
+    if(new_kth==NULL){
+        return NULL;
+    }
     new_kth->kt_kstack=alloc_stack(); // Initialize the stack
+    if(new_kth->kt_kstack==NULL){
+        slab_obj_free(kthread_allocator,new_kth);
+        return NULL;
+    }
     context_setup(&new_kth->kt_ctx,func,arg1,arg2,new_kth->kt_kstack,DEFAULT_STACK_SIZE,curproc->p_pml4); 
     new_kth->kt_retval=NULL;
     new_kth->kt_errno=0;
@@ -104,8 +111,42 @@ kthread_t *kthread_create(proc_t *proc, kthread_func_t func, long arg1,
  */
 kthread_t *kthread_clone(kthread_t *thr)
 {
-    NOT_YET_IMPLEMENTED("VM: kthread_clone");
-    return NULL;
+    kthread_t *new_thr=slab_obj_alloc(kthread_allocator);
+    if(new_thr==NULL){
+        return NULL;
+    }
+
+    spinlock_lock(&thr->kt_lock);
+    new_thr->kt_kstack=alloc_stack();
+    if(new_thr->kt_kstack==NULL){
+        spinlock_unlock(&thr->kt_lock);
+        slab_obj_free(kthread_allocator,new_thr);
+        return NULL;
+    }
+    
+    // Initialize context
+    new_thr->kt_ctx.c_kstack=thr->kt_ctx.c_kstack;
+    new_thr->kt_ctx.c_kstacksz=thr->kt_ctx.c_kstacksz;
+    
+    // Initialize retval, errno, cancelled
+    new_thr->kt_retval=thr->kt_retval;
+    new_thr->kt_errno=thr->kt_errno;
+    new_thr->kt_cancelled=thr->kt_cancelled;
+    spinlock_unlock(&thr->kt_lock);
+
+    // Initialize other part
+    spinlock_init(&new_thr->kt_lock); // Initialize the spinlock
+    list_link_init(&new_thr->kt_plink);
+    list_link_init(&new_thr->kt_qlink); //Initialize two list link
+    list_init(&new_thr->kt_mutexes); 
+    new_thr->kt_wchan=NULL; // Initialize the queue of the thread
+    new_thr->kt_state=KT_NO_STATE; // TODO: Not sure
+    new_thr->kt_proc=NULL;
+    new_thr->kt_recent_core=~0UL;
+    new_thr->kt_preemption_count=0; 
+
+    // NOT_YET_IMPLEMENTED("VM: kthread_clone");
+    return new_thr;
 }
 
 /*

@@ -201,7 +201,7 @@ proc_t *proc_create(const char *name)
     list_link_init(&new_proc->p_child_link); // Initialize two list link
     list_link_init(&new_proc->p_list_link);
     list_insert_tail(&proc_list,&new_proc->p_list_link); // Insert the new_proc into the proc_list
-    list_insert_tail(&curproc->p_children,&new_proc->p_child_link); // Insert it into parents' children list
+    list_insert_tail(&curproc->p_children,&new_proc->p_child_link); // Insert it into parents' children list(current process)
 
     spinlock_init(&new_proc->p_children_lock); // Initialize spin lock
     new_proc->p_status=0; 
@@ -214,15 +214,21 @@ proc_t *proc_create(const char *name)
 
    // Initialize VFS part
     for(int i=0;i<NFILES;i++){
-        new_proc->p_files[i]=curproc->p_files[i];
+        new_proc->p_files[i]=curproc->p_files[i];   // Copy the file from current process to new process
         if(new_proc->p_files[i]!=NULL)  {
-            fref(new_proc->p_files[i]);
+            fref(new_proc->p_files[i]);     // Increment the refcount is the file exist
         }
     }
-    new_proc->p_cwd=curproc->p_cwd;
+    new_proc->p_cwd=curproc->p_cwd;     // Set the current working directory
     if(new_proc->p_cwd!=NULL){
         vref(new_proc->p_cwd);
     }
+
+    // Initialize VM part
+    new_proc->p_brk=curproc->p_brk;     // Set the break
+    new_proc->p_start_brk=curproc->p_start_brk;
+    new_proc->p_vmmap=vmmap_clone(curproc->p_vmmap);    // Set the vmmap
+    new_proc->p_vmmap->vmm_proc = new_proc;
     // NOT_YET_IMPLEMENTED("PROCS: proc_create");
     return new_proc;
 }
@@ -254,7 +260,12 @@ void proc_cleanup(long status)
     if(curproc->p_cwd){
         vput(&curproc->p_cwd);
     }
+    if(curproc->p_vmmap){
+        vmmap_destroy(&curproc->p_vmmap);
+    }
+
     if(curproc->p_pid==PID_INIT){  // If the current process is initial process
+       
        initproc_finish(); // Shup down the weenix
     }
     else{
@@ -265,6 +276,10 @@ void proc_cleanup(long status)
                                                                                  // initial process's list                                                                                  
         }
     }
+
+
+   
+   
     // NOT_YET_IMPLEMENTED("PROCS: proc_cleanup");
 }
 

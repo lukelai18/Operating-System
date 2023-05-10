@@ -167,19 +167,22 @@ static void *initproc_run(long arg1, void *arg2)
     vfs_init();
     make_devices();
 #endif
-  vfstest_main(1,NULL);
-  s5fstest_main();
+//   vfstest_main(1,NULL);
+//   s5fstest_main();
 /* To create a kshell on each terminal */
-#ifdef __DRIVERS__
-    char name[32] = {0};
-    for (long i = 0; i < __NTERMS__; i++)
-    {
-        snprintf(name, sizeof(name), "kshell%ld", i);
-        proc_t *proc = proc_create("ksh");
-        kthread_t *thread = kthread_create(proc, kshell_proc_run, i, NULL);
-        sched_make_runnable(thread);
-    }
-#endif
+// #ifdef __DRIVERS__
+//     char name[32] = {0};
+//     for (long i = 0; i < __NTERMS__; i++)
+//     {
+//         snprintf(name, sizeof(name), "kshell%ld", i);
+//         proc_t *proc = proc_create("ksh");
+//         kthread_t *thread = kthread_create(proc, kshell_proc_run, i, NULL);
+//         sched_make_runnable(thread);
+//     }
+// #endif
+char *argv[2] = {"segfault", NULL}; 
+char *envp[1] = {NULL}; 
+kernel_execve("/usr/bin/segfault", argv, envp);
 int status;
 /* Run kshell commands until each kshell process exits */
 while (do_waitpid(-1, &status, 0) != -ECHILD)
