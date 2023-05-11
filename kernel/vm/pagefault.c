@@ -87,6 +87,8 @@ void handle_pagefault(uintptr_t vaddr, uintptr_t cause)
         ptflags=ptflags|PT_WRITE;
     }
     uintptr_t phy_addr= pt_virt_to_phys(vaddr);
+    // Create a relation between the virtual address with the page map inside the file
+    // Like, page 10-11 may be mapped to the page 0 inside the file
     long tmp2=pt_map(curproc->p_pml4,phy_addr,(uintptr_t)PAGE_ALIGN_DOWN(vaddr),pdflags,ptflags);
     if(tmp<0){
         kmutex_unlock(&pf->pf_mutex);

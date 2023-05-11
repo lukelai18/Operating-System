@@ -106,7 +106,7 @@ long do_mmap(void *addr, size_t len, int prot, int flags, int fd, off_t off,
     //     (size_t)PAGE_ALIGN_UP(len)/PAGE_SIZE);
     // *ret=PN_TO_ADDR(new_vma->vma_start);
 
-    // NOT_YET_IMPLEMENTED("VM: do_mmap");
+    // // NOT_YET_IMPLEMENTED("VM: do_mmap");
     return 0;
 }
 
@@ -143,5 +143,5 @@ long do_munmap(void *addr, size_t len)
 
     // // NOT_YET_IMPLEMENTED("VM: do_munmap");
     // return tmp;
-    return -1;
+    return 0;
 }

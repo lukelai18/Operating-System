@@ -121,7 +121,7 @@ long addr_perm(proc_t *p, const void *vaddr, int perm)
         return 0;
     }
 
-    return ((vma->vma_prot & perm) == perm);
+    return ((cur_vma->vma_prot & perm) == perm);
 
     // // Check page protection flags, read, write and execute
     // if((perm&PROT_EXEC)&&(cur_vma->vma_prot&PROT_EXEC)){
@@ -154,8 +154,8 @@ long range_perm(proc_t *p, const void *vaddr, size_t len, int perm)
     // size_t cur_vaddr=(size_t)vaddr;
     // size_t end_vaddr=(size_t)vaddr+len;
 
-    size_t start_pagenum=(size_t)ADDR_TO_PN(vaddr);
-    size_t end_pagenum=(size_t)ADDR_TO_PN(vaddr+len-1);
+    size_t start_pagenum=(size_t)ADDR_TO_PN((uintptr_t)vaddr);
+    size_t end_pagenum=(size_t)ADDR_TO_PN((uintptr_t)vaddr+len-1);
 
     for(size_t i=start_pagenum;i<=end_pagenum;i++){
         if(!addr_perm(p,PN_TO_ADDR(i),perm)){
@@ -163,6 +163,7 @@ long range_perm(proc_t *p, const void *vaddr, size_t len, int perm)
         }
     }
 
+    return 1;
     // while(cur_vaddr<end_vaddr){
     //     if(!addr_perm(p,(void *)cur_vaddr,perm)){
     //         return 0;
@@ -176,6 +177,5 @@ long range_perm(proc_t *p, const void *vaddr, size_t len, int perm)
     //     }
     // }
 
-    // NOT_YET_IMPLEMENTED("VM: range_perm");
-    return 1;
+    // NOT_YET_IMPLEMENTED("VM: range_perm")
 }
