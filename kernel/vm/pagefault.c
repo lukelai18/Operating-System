@@ -75,7 +75,8 @@ void handle_pagefault(uintptr_t vaddr, uintptr_t cause)
     pframe_t *pf;
     // TODO: Check the vaddr
     mobj_lock(fault_vmarea->vma_obj);
-    long tmp=mobj_get_pframe(fault_vmarea->vma_obj,ADDR_TO_PN(vaddr),cause&FAULT_WRITE,&pf);
+    long tmp=mobj_get_pframe(fault_vmarea->vma_obj,ADDR_TO_PN(vaddr)-fault_vmarea->vma_start+fault_vmarea->vma_off,
+        cause&FAULT_WRITE,&pf);
     if(tmp<0){
         mobj_unlock(fault_vmarea->vma_obj);
         do_exit(EFAULT);
@@ -86,7 +87,7 @@ void handle_pagefault(uintptr_t vaddr, uintptr_t cause)
     if(cause&FAULT_WRITE){
         ptflags=ptflags|PT_WRITE;
     }
-    uintptr_t phy_addr= pt_virt_to_phys(vaddr);
+    uintptr_t phy_addr= pt_virt_to_phys((uintptr_t)pf->pf_addr);
     // Create a relation between the virtual address with the page map inside the file
     // Like, page 10-11 may be mapped to the page 0 inside the file
     long tmp2=pt_map(curproc->p_pml4,phy_addr,(uintptr_t)PAGE_ALIGN_DOWN(vaddr),pdflags,ptflags);
