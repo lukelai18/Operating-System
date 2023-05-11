@@ -463,8 +463,9 @@ pid_t do_waitpid(pid_t pid, int *status, int options)
         if(find_pid==-1){  // If we cannot find a terminated child, put parents into sleep firstly
             sched_sleep_on(&curproc->p_wait,&curproc->p_children_lock); // Put parents into its own wait queue
         }
-        }
+    }
 }
+    return find_pid;
    // NOT_YET_IMPLEMENTED("PROCS: do_waitpid");
 }
 
