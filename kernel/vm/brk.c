@@ -67,24 +67,29 @@ long do_brk(void *addr, void **ret)
     // }
     // // TODO: How to consider to page align for the start brk
     
+    // // We need to Initialize a new heap
+    // if(curproc->p_brk==curproc->p_start_brk){
+    //     size_t start_pn=ADDR_TO_PN(PAGE_ALIGN_UP(curproc->p_start_brk));
+    //     size_t end_pn=ADDR_TO_PN(PAGE_ALIGN_UP(addr));
 
-    // // // We need to Initialize a new heap
-    // // if(curproc->p_brk==curproc->p_start_brk){
-    // //     size_t start_pn=ADDR_TO_PN(PAGE_ALIGN_UP(curproc->p_start_brk));
-    // //     size_t end_pn=ADDR_TO_PN(PAGE_ALIGN_UP(addr));
-    // //     vmarea_t *new_vm;
-    // //     vmmap_map(curproc->p_vmmap,NULL,start_pn,end_pn-start_pn,PROT_READ|PROT_WRITE, 
-    // //     MAP_PRIVATE|MAP_ANON | MAP_FIXED,0,VMMAP_DIR_HILO,&new_vm);
+    //     if(end_pn==start_pn){
+    //         return -ENOMEM;
+    //     }else{
+    //         if(!vmmap_is_range_empty(curproc->p_vmmap,start_pn,end_pn-start_pn)){
+    //             vmmap_remove(curproc->p_vmmap,start_pn,end_pn-start_pn);
+    //         }
 
-    // //     if(start_pn!=end_pn){
-    // //         vmmap_remove(curproc->p_vmmap,start_pn,end_pn-start_pn);    // Clean up the specified range
-    // //     }
+    //         vmarea_t *new_vm;
+    //         long tmp=vmmap_map(curproc->p_vmmap,NULL,start_pn,end_pn-start_pn,PROT_READ|PROT_WRITE, 
+    //         MAP_PRIVATE|MAP_ANON | MAP_FIXED,0,VMMAP_DIR_HILO,&new_vm);
 
-    // //     curproc->p_brk=addr;
-    // //     // TODO: What do I need to do when I want to initialize a heap
-    // // }
+    //         if(tmp<0){
+    //             return tmp;
+    //         }
+    //     }
 
-    // if(addr<curproc->p_brk){
+    //     curproc->p_brk=addr;
+    // } else if(addr<curproc->p_brk){
     //     // The heap this to shrink
     //     size_t new_end=ADDR_TO_PN(PAGE_ALIGN_UP(addr)); // Get the start page number
     //     size_t old_end=ADDR_TO_PN(PAGE_ALIGN_UP(curproc->p_brk));    // Get the end page number
@@ -106,11 +111,11 @@ long do_brk(void *addr, void **ret)
 
     //     curproc->p_brk=addr;
         
-    //     vmarea_t *cur_vma=vmmap_lookup();
+    //     // vmarea_t *cur_vma=vmmap_lookup();
 
     // }
     // *ret=curproc->p_brk;
     // // TODO: Need to come back
     // NOT_YET_IMPLEMENTED("VM: do_brk");
-    // return 0;
+    return 0;
 }
