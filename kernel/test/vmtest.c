@@ -12,7 +12,7 @@
 #include "mm/page.h"
 #include "mm/slab.h"
 #include "mm/kmalloc.h"
-/// #include "vm/vmmap.h"
+#include "vm/vmmap.h"
 
 long test_vmmap() {
     vmmap_t *map = curproc->p_vmmap;

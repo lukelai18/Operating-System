@@ -460,7 +460,7 @@ long vmmap_remove(vmmap_t *map, size_t lopage, size_t npages)
             // Update the start, end and off, and initalize it
             new_vmarea->vma_start=end_page;
             new_vmarea->vma_end=cur_vmarea->vma_end;
-            new_vmarea->vma_off=cur_vmarea->vma_off+end_page+cur_vmarea->vma_start;
+            new_vmarea->vma_off=cur_vmarea->vma_off+end_page-cur_vmarea->vma_start;
             new_vmarea->vma_flags=cur_vmarea->vma_flags;
             new_vmarea->vma_prot=cur_vmarea->vma_prot;
             new_vmarea->vma_obj=cur_vmarea->vma_obj;

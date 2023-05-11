@@ -180,9 +180,10 @@ static void *initproc_run(long arg1, void *arg2)
 //         sched_make_runnable(thread);
 //     }
 // #endif
-char *argv[2] = {"hello", NULL}; 
+// vmtest_main(1, NULL);
+char *argv[2] = {"segfault", NULL}; 
 char *envp[1] = {NULL}; 
-kernel_execve("/usr/bin/hello", argv, envp);
+kernel_execve("/usr/bin/segfault", argv, envp);
 int status;
 /* Run kshell commands until each kshell process exits */
 while (do_waitpid(-1, &status, 0) != -ECHILD)
