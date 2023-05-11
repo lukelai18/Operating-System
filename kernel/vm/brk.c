@@ -65,7 +65,6 @@ long do_brk(void *addr, void **ret)
     //     *ret=curproc->p_brk;
     //     return 0;
     // }
-    // // TODO: How to consider to page align for the start brk
     
     // // We need to Initialize a new heap
     // if(curproc->p_brk==curproc->p_start_brk){
@@ -78,13 +77,17 @@ long do_brk(void *addr, void **ret)
     //         if(!vmmap_is_range_empty(curproc->p_vmmap,start_pn,end_pn-start_pn)){
     //             vmmap_remove(curproc->p_vmmap,start_pn,end_pn-start_pn);
     //         }
+            
+    //         // If we cannot find a vmarea, we need to create it
+    //         vmarea_t *new_vm=vmmap_lookup(curproc->p_vmmap,start_pn);
+    //         if(new_vm==NULL){
+    //             // Create a new vmarea
+    //             long tmp=vmmap_map(curproc->p_vmmap,NULL,start_pn,end_pn-start_pn,PROT_READ|PROT_WRITE, 
+    //                 MAP_PRIVATE|MAP_ANON | MAP_FIXED,0,VMMAP_DIR_HILO,&new_vm);
 
-    //         vmarea_t *new_vm;
-    //         long tmp=vmmap_map(curproc->p_vmmap,NULL,start_pn,end_pn-start_pn,PROT_READ|PROT_WRITE, 
-    //         MAP_PRIVATE|MAP_ANON | MAP_FIXED,0,VMMAP_DIR_HILO,&new_vm);
-
-    //         if(tmp<0){
-    //             return tmp;
+    //             if(tmp<0){
+    //                 return tmp;
+    //             }
     //         }
     //     }
     //     curproc->p_brk=addr;
@@ -109,14 +112,12 @@ long do_brk(void *addr, void **ret)
     //         // vmarea_t *cur_vma=vmmap_lookup(curproc->p_vmmap,);
     //     }
         
-
-    //     curproc->p_brk=addr;
-        
+    //     curproc->p_brk=addr;      
     //     // vmarea_t *cur_vma=vmmap_lookup();
 
     // }
     // *ret=curproc->p_brk;
     // // TODO: Need to come back
     // // NOT_YET_IMPLEMENTED("VM: do_brk");
-     return 0;
+    // return 0;
 }
