@@ -69,6 +69,7 @@ void syscall_init(void) { intr_register(INTR_SYSCALL, syscall_handler); }
  */
 static long sys_read(read_args_t *args)
 {
+    dbg(DBG_VM, " In sys_read");
     read_args_t kernel_args;
     long ret1=copy_from_user(&kernel_args,args,sizeof(read_args_t));     // Copy from userland args
     ERROR_OUT_RET(ret1);
@@ -89,8 +90,7 @@ static long sys_read(read_args_t *args)
         // return -1;
     }
     // Copy to userland args after syscall
-    // TODO: 
-    long ret2=copy_to_user((char *)args->buf,buf,read_bytes);
+    long ret2=copy_to_user(kernel_args.buf,buf,read_bytes);
     ERROR_OUT_RET(ret2);
     
     page_free_n(buf,npages);
@@ -109,6 +109,7 @@ static long sys_read(read_args_t *args)
  */
 static long sys_write(write_args_t *args)
 {
+    dbg(DBG_VM, " In sys_write");
     write_args_t kernel_args;
     long ret1=copy_from_user(&kernel_args,args,sizeof(write_args_t));     // Copy from userland args
     ERROR_OUT_RET(ret1);
@@ -153,6 +154,7 @@ static long sys_write(write_args_t *args)
  */
 static long sys_getdents(getdents_args_t *args)
 {
+    dbg(DBG_VM, " In sys_getdents");
     getdents_args_t kernel_args;
     // Copy userland arg into kernel arg
     long ret1=copy_from_user(&kernel_args,args,sizeof(getdents_args_t));     // Copy from userland args
@@ -172,7 +174,7 @@ static long sys_getdents(getdents_args_t *args)
         ssize_t read_bytes=do_getdent(kernel_args.fd,&dirp);
         ERROR_OUT_RET(read_bytes);
 
-        long ret2=copy_to_user((args->dirp+total_read_bytes),&dirp,read_bytes);
+        long ret2=copy_to_user((kernel_args.dirp+total_read_bytes),&dirp,read_bytes);
         ERROR_OUT_RET(ret2);
 
         total_read_bytes+=read_bytes;

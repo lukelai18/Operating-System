@@ -39,16 +39,18 @@ vmarea_t *vmarea_alloc(void)
         return NULL;
     }
     // Initialize it, need to come back
-    new_vmarea->vma_start=0;
-    new_vmarea->vma_off=0;
-    new_vmarea->vma_end=0;
+    memset(new_vmarea, 0, sizeof(vmarea_t));
 
-    new_vmarea->vma_flags=0;
-    new_vmarea->vma_prot=0;
+    // new_vmarea->vma_start=0;
+    // new_vmarea->vma_off=0;
+    // new_vmarea->vma_end=0;
 
-    new_vmarea->vma_vmmap=NULL;
-    new_vmarea->vma_obj=NULL;
-    list_link_init(&new_vmarea->vma_plink);
+    // new_vmarea->vma_flags=0;
+    // new_vmarea->vma_prot=0;
+
+    // new_vmarea->vma_vmmap=NULL;
+    // new_vmarea->vma_obj=NULL;
+    // list_link_init(&new_vmarea->vma_plink);
     //NOT_YET_IMPLEMENTED("VM: vmarea_alloc");
     
     return new_vmarea;
@@ -60,8 +62,10 @@ vmarea_t *vmarea_alloc(void)
  */
 void vmarea_free(vmarea_t *vma)
 {   
-    list_remove(&vma->vma_plink); // Remove it from lists
-
+    dbg(DBG_VM, " In vmarea_free, the freeed vmarea is %p",vma);
+    if(list_link_is_linked(&vma->vma_plink)){
+        list_remove(&vma->vma_plink); // Remove it from lists
+    }   
     if(vma->vma_obj){
         mobj_put(&vma->vma_obj); // Put memory object
     }
@@ -75,6 +79,7 @@ void vmarea_free(vmarea_t *vma)
  */
 vmmap_t *vmmap_create(void)
 {
+    dbg(DBG_VM, " In vmmap_create");
     vmmap_t *new_vmmap=slab_obj_alloc(vmmap_allocator);
 
     if(new_vmmap==NULL) {return NULL;}
@@ -91,6 +96,7 @@ vmmap_t *vmmap_create(void)
  */
 void vmmap_destroy(vmmap_t **mapp)
 {
+    dbg(DBG_VM, " In vmmap_destroy");
     // vmarea_t *cur_vmarea;
     list_iterate(&(*mapp)->vmm_list,cur_vmarea,vmarea_t,vma_plink){
         vmarea_free(cur_vmarea);    // Free each vma in the list
@@ -107,6 +113,7 @@ void vmmap_destroy(vmmap_t **mapp)
  */
 void vmmap_insert(vmmap_t *map, vmarea_t *new_vma)
 {
+    dbg(DBG_VM, " In vmmap_insert");
     KASSERT(new_vma->vma_end>=new_vma->vma_start&&"Make sure the start cannot be greater than end");
     // KASSERT(list_link_is_linked(&new_vma->vma_plink) && "Make sure the link list is valid");
     KASSERT((new_vma->vma_flags&MAP_SHARED)||((new_vma->vma_flags&MAP_PRIVATE)&&
@@ -144,8 +151,8 @@ void vmmap_insert(vmmap_t *map, vmarea_t *new_vma)
  */
 ssize_t vmmap_find_range(vmmap_t *map, size_t npages, int dir)
 {
+    dbg(DBG_VM, "vmmap_find_range,the current map is %p, page size is %ld, the Mode is %d",map,npages,dir);
     // KASSERT(dir==VMMAP_DIR_HILO||dir==VMMAP_DIR_LOHI);
-    
     // Check the begining
     if(dir==VMMAP_DIR_LOHI){    // From low to high
         if(list_empty(&map->vmm_list)){
@@ -211,6 +218,7 @@ ssize_t vmmap_find_range(vmmap_t *map, size_t npages, int dir)
  */
 vmarea_t *vmmap_lookup(vmmap_t *map, size_t vfn)
 {
+    dbg(DBG_VM,"vmmap_lookup, the current map is %p, page number is %ld",map,vfn);
     vmarea_t *cur_vmarea;
     list_iterate(&map->vmm_list,cur_vmarea,vmarea_t,vma_plink){
         if(cur_vmarea->vma_start<=vfn&&cur_vmarea->vma_end>vfn){
@@ -226,6 +234,7 @@ vmarea_t *vmmap_lookup(vmmap_t *map, size_t vfn)
  */
 void vmmap_collapse(vmmap_t *map)
 {
+    dbg(DBG_VM,"vmmap_collapse, the current map is %p",map);
     list_iterate(&map->vmm_list, vma, vmarea_t, vma_plink)
     {
         if (vma->vma_obj->mo_type == MOBJ_SHADOW)
@@ -257,6 +266,7 @@ void vmmap_collapse(vmmap_t *map)
  */
 vmmap_t *vmmap_clone(vmmap_t *map)
 {
+    dbg(DBG_VM,"vmmap_clone, the current map is %p",map);
     vmmap_t *new_map=vmmap_create();
 
     if(new_map== NULL){
@@ -332,6 +342,7 @@ vmmap_t *vmmap_clone(vmmap_t *map)
 long vmmap_map(vmmap_t *map, vnode_t *file, size_t lopage, size_t npages,
                int prot, int flags, off_t off, int dir, vmarea_t **new_vma)
 {
+    dbg(DBG_VM,"vmmap_map, the current map is %p",map);
     // Assert all the input is valid
     KASSERT(map!=NULL&&"map should not be NULL");
     KASSERT(prot==PROT_NONE||prot&PROT_READ|| prot&PROT_WRITE||prot&PROT_EXEC);
@@ -370,18 +381,22 @@ long vmmap_map(vmmap_t *map, vnode_t *file, size_t lopage, size_t npages,
         }
     }
 
-    // if(flags&MAP_PRIVATE){
-    //     mobj_t *sha_obj=shadow_create(new_mobj);    // Will be locked here
+    if(flags&MAP_PRIVATE){
+        mobj_t *sha_obj=shadow_create(new_mobj);    // Will be locked here
         
-    //     if(sha_obj==NULL){
-    //         mobj_unlock(new_mobj);           
-    //         return -ENOMEM;
-    //     }
+        if(sha_obj==NULL){
+            mobj_unlock(new_mobj);           
+            return -ENOMEM;
+        }
 
-    //     mobj_unlock(new_mobj);
-    //     new_mobj=sha_obj;
-    //     mobj_lock(new_mobj);
-    // }
+        mobj_t *old_mobj=new_mobj;
+
+        mobj_unlock(new_mobj);
+        new_mobj=sha_obj;
+        mobj_lock(new_mobj);
+
+        mobj_put(&old_mobj);
+    }
 
     // Initialize the new vmarea_t
     vmarea_t *new=vmarea_alloc();
@@ -442,6 +457,7 @@ long vmmap_map(vmmap_t *map, vnode_t *file, size_t lopage, size_t npages,
  */
 long vmmap_remove(vmmap_t *map, size_t lopage, size_t npages)
 {
+    dbg(DBG_VM,"vmmap_remove, the current map is %p",map);
     if(npages==0){
         return 0;   // We don't need to remove
     }
@@ -499,6 +515,7 @@ long vmmap_remove(vmmap_t *map, size_t lopage, size_t npages)
  */
 long vmmap_is_range_empty(vmmap_t *map, size_t startvfn, size_t npages)
 {
+    dbg(DBG_VM,"vmmap_is_range_empty, the current map is %p",map);
     if(npages==0){  // If there are no address space
         return 1;
     }
@@ -535,6 +552,7 @@ long vmmap_is_range_empty(vmmap_t *map, size_t startvfn, size_t npages)
  */
 long vmmap_read(vmmap_t *map, const void *vaddr, void *buf, size_t count)
 {
+    dbg(DBG_VM,"vmmap_read, the current map is %p",map);
     KASSERT(map!=NULL&&"Assume map is not NULL");
     KASSERT(vaddr!=NULL&&"Should be a valid address");
     KASSERT(buf!=NULL&&"Should be a valid buf");
@@ -667,6 +685,7 @@ long vmmap_read(vmmap_t *map, const void *vaddr, void *buf, size_t count)
  */
 long vmmap_write(vmmap_t *map, void *vaddr, const void *buf, size_t count)
 {
+    dbg(DBG_VM,"vmmap_write, the current map is %p",map);
     KASSERT(map!=NULL&&"Assume map is not NULL");
     KASSERT(vaddr!=NULL&&"Should be a valid address");
     KASSERT(buf!=NULL&&"Should be a valid buf");

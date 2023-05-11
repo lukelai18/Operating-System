@@ -119,5 +119,5 @@ long do_brk(void *addr, void **ret)
     // *ret=curproc->p_brk;
     // // TODO: Need to come back
     // // NOT_YET_IMPLEMENTED("VM: do_brk");
-    // return 0;
+    return 0;
 }
