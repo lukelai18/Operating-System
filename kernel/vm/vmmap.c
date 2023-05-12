@@ -187,13 +187,13 @@ ssize_t vmmap_find_range(vmmap_t *map, size_t npages, int dir)
     }  else{    // From high to low
         size_t start_pn=ADDR_TO_PN(USER_MEM_HIGH);
         size_t end_pn=0;
-        if(list_empty(&map->vmm_list)&&start_pn-npages>=ADDR_TO_PN(USER_MEM_LOW)){
-            return (start_pn-npages);
+        if(list_empty(&map->vmm_list)&&start_pn>=ADDR_TO_PN(USER_MEM_LOW)+npages){
+            return (start_pn-npages);   // As high as possible
         }
         
         list_iterate_reverse(&map->vmm_list,cur_vmarea,vmarea_t,vma_plink){
             end_pn=cur_vmarea->vma_end;
-            if(start_pn-cur_vmarea->vma_end>=npages){
+            if(start_pn-end_pn>=npages){
                 return start_pn-npages;
             }
             start_pn=cur_vmarea->vma_start;
@@ -201,7 +201,8 @@ ssize_t vmmap_find_range(vmmap_t *map, size_t npages, int dir)
 
         // If we still cannot find one available page
         // Check the first vmarea
-        if(start_pn-ADDR_TO_PN(USER_MEM_LOW)>=npages){
+        end_pn=ADDR_TO_PN(USER_MEM_LOW);
+        if(start_pn-end_pn>=npages){
             return (start_pn-npages);
         }
     }
