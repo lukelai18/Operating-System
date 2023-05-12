@@ -207,7 +207,7 @@ static long shadow_get_pframe(mobj_t *o, size_t pagenum, long forwrite,
         long tmp=mobj_get_pframe(cur_o,pagenum,forwrite,&cur_pf);   // This one will lock pfp on return in any case
         mobj_unlock(cur_o);
         if(tmp<0){
-            kmutex_unlock(&cur_pf->pf_mutex);   
+            // kmutex_unlock(&cur_pf->pf_mutex);   
             return tmp;
         }
         *pfp=cur_pf;

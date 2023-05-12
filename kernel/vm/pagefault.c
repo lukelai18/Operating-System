@@ -84,6 +84,8 @@ void handle_pagefault(uintptr_t vaddr, uintptr_t cause)
     long tmp=mobj_get_pframe(fault_vmarea->vma_obj,ADDR_TO_PN(vaddr)-fault_vmarea->vma_start+fault_vmarea->vma_off,
         cause&FAULT_WRITE,&pf);
     if(tmp<0){
+        pframe_release(&pf);
+        // kmutex_unlock(&pf->pf_mutex);
         mobj_unlock(fault_vmarea->vma_obj);
         do_exit(EFAULT);
         panic("Cannot get pframe");
