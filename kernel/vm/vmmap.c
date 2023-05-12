@@ -583,6 +583,7 @@ long vmmap_read(vmmap_t *map, const void *vaddr, void *buf, size_t count)
                 // Get the required page frame
                 long tmp=mobj_get_pframe(cur_vmarea->vma_obj,cur_off+i,1,&pf);
                 if(tmp<0){
+                    kmutex_unlock(&pf->pf_mutex);
                     mobj_unlock(cur_vmarea->vma_obj);
                     return tmp;
                 }
@@ -700,8 +701,8 @@ long vmmap_write(vmmap_t *map, void *vaddr, const void *buf, size_t count)
         // If the start page is inside cur_vmarea
         if(cur_vmarea->vma_start<=start_page&&cur_vmarea->vma_end>start_page){
             mobj_lock(cur_vmarea->vma_obj);     // Lock mobj firstly
-            
             // The current offset
+            // TODO: Do I need to update start_page later?
             size_t cur_off=start_page-cur_vmarea->vma_start+cur_vmarea->vma_off;
             size_t needed_pagenum=0;
 
@@ -719,6 +720,7 @@ long vmmap_write(vmmap_t *map, void *vaddr, const void *buf, size_t count)
                 // Get the required page frame
                 long tmp=mobj_get_pframe(cur_vmarea->vma_obj,cur_off+i,1,&pf);
                 if(tmp<0){
+                    kmutex_unlock(&pf->pf_mutex);
                     mobj_unlock(cur_vmarea->vma_obj);
                     return tmp;
                 }
