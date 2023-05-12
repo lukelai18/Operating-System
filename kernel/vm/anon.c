@@ -38,7 +38,7 @@ void anon_init()
  */
 mobj_t *anon_create()
 {
-    mobj_t *new_anon=(mobj_t *)slab_obj_alloc(anon_allocator);
+    mobj_t *new_anon=slab_obj_alloc(anon_allocator);
 
     if(new_anon==NULL){
         return NULL;

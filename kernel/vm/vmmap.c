@@ -119,20 +119,30 @@ void vmmap_insert(vmmap_t *map, vmarea_t *new_vma)
     KASSERT((new_vma->vma_flags&MAP_SHARED)||((new_vma->vma_flags&MAP_PRIVATE)&&
     "Make sure either MAP_SHARED and MAP_PRIVATE is set"));
 
+    size_t start_pn=ADDR_TO_PN(USER_MEM_LOW);
+    size_t end_pn=0;
+
     vmarea_t *cur_vmarea;
     // vmarea_t *pre_vmarea;
     list_iterate(&map->vmm_list,cur_vmarea,vmarea_t,vma_plink){
         // If we found we can insert it into one vmarea
-        if(cur_vmarea->vma_start>new_vma->vma_start){
+        end_pn=cur_vmarea->vma_start;
+        // If new vmarea can be inserted in front of this cur_vmarea
+        if(new_vma->vma_start>=start_pn&&new_vma->vma_end<end_pn){
             list_insert_before(&cur_vmarea->vma_plink,&new_vma->vma_plink);
             new_vma->vma_vmmap=map; // Update it's corresponding vmmap
             return;
         }
+        start_pn=cur_vmarea->vma_end;
         //pre_vmarea=cur_vmarea;
     }
+
     // If we cannot find an appropriate place, we may insert it in the tail
-    list_insert_tail(&map->vmm_list,&new_vma->vma_plink);
-    new_vma->vma_vmmap=map;
+    end_pn=ADDR_TO_PN(USER_MEM_HIGH);
+    if(new_vma->vma_start>=start_pn&&new_vma->vma_end<end_pn){
+        list_insert_tail(&map->vmm_list,&new_vma->vma_plink);
+        new_vma->vma_vmmap=map;
+    }
     // NOT_YET_IMPLEMENTED("VM: vmmap_insert");
 }
 
@@ -391,7 +401,7 @@ long vmmap_map(vmmap_t *map, vnode_t *file, size_t lopage, size_t npages,
 
         mobj_t *old_mobj=new_mobj;
 
-        mobj_unlock(new_mobj);
+        mobj_unlock(old_mobj);
         new_mobj=sha_obj;
         mobj_lock(new_mobj);
 
