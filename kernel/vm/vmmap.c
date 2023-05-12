@@ -202,7 +202,7 @@ ssize_t vmmap_find_range(vmmap_t *map, size_t npages, int dir)
         // If we still cannot find one available page
         // Check the first vmarea
         if(start_pn-ADDR_TO_PN(USER_MEM_LOW)>=npages){
-            return ADDR_TO_PN(USER_MEM_LOW);
+            return (start_pn-ADDR_TO_PN(USER_MEM_LOW));
         }
     }
     // NOT_YET_IMPLEMENTED("VM: vmmap_find_range");
