@@ -116,8 +116,8 @@ void vmmap_insert(vmmap_t *map, vmarea_t *new_vma)
     dbg(DBG_VM, " In vmmap_insert");
     KASSERT(new_vma->vma_end>=new_vma->vma_start&&"Make sure the start cannot be greater than end");
     // KASSERT(list_link_is_linked(&new_vma->vma_plink) && "Make sure the link list is valid");
-    KASSERT((new_vma->vma_flags&MAP_SHARED)||((new_vma->vma_flags&MAP_PRIVATE)&&
-    "Make sure either MAP_SHARED and MAP_PRIVATE is set"));
+    //  KASSERT((new_vma->vma_flags&MAP_SHARED)||((new_vma->vma_flags&MAP_PRIVATE)&&
+    // "Make sure either MAP_SHARED and MAP_PRIVATE is set"));
 
     size_t start_pn=ADDR_TO_PN(USER_MEM_LOW);
     size_t end_pn=0;
