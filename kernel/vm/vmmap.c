@@ -706,11 +706,11 @@ long vmmap_write(vmmap_t *map, void *vaddr, const void *buf, size_t count)
             size_t needed_pagenum=0;
 
             // The written page num cannot beyond the range of this vmarea_t
-            if(cur_vmarea->vma_end-cur_off<PAGE_ALIGN_UP(ADDR_TO_PN(count-cur_write_bytes))){
+            if(cur_vmarea->vma_end-cur_off<ADDR_TO_PN(PAGE_ALIGN_UP(count-cur_write_bytes))){
                 needed_pagenum=cur_vmarea->vma_end-cur_off;
             }else{
                 // We don't need to write the entire PAGE
-                needed_pagenum=PAGE_ALIGN_UP(ADDR_TO_PN(count-cur_write_bytes));
+                needed_pagenum=ADDR_TO_PN(PAGE_ALIGN_UP(count-cur_write_bytes));
             }
 
             for(size_t i=0;i<needed_pagenum;i++){
