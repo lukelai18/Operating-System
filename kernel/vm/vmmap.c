@@ -171,54 +171,38 @@ ssize_t vmmap_find_range(vmmap_t *map, size_t npages, int dir)
             return start_pn;
         }
         
-        // Check the first vmarea
-        vmarea_t *first_vmarea=list_item(map->vmm_list.l_next,vmarea_t,vma_plink);
-        if(first_vmarea->vma_start-ADDR_TO_PN(USER_MEM_LOW)>=npages){
-            return ADDR_TO_PN(USER_MEM_LOW);
-        }
-
-        // Initialize cur_vmare and pre_vmarea
-        vmarea_t *cur_vmarea=NULL;
-        vmarea_t *pre_vmarea=NULL;
-        
-        // Check the middle vmarea
         list_iterate(&map->vmm_list,cur_vmarea,vmarea_t,vma_plink){
-            if(cur_vmarea!=NULL&&pre_vmarea!=NULL&&cur_vmarea->vma_start-pre_vmarea->vma_end>=npages){
-                return pre_vmarea->vma_end;
+            end_pn=cur_vmarea->vma_start;
+            if(cur_vmarea->vma_start-start_pn>=npages){
+                return start_pn;
             }
-            pre_vmarea=cur_vmarea;
+            start_pn=cur_vmarea->vma_end;
         }
 
-        // Check the last vmarea, cur_vmarea should be the last vmarea at this time
-        if(ADDR_TO_PN(USER_MEM_HIGH)-cur_vmarea->vma_end>=npages){
-            return cur_vmarea->vma_end;
+        // If we cannot find a range in the map list, check the last address space
+        // end_pn=ADDR_TO_PN(USER_MEM_HIGH);
+        if(ADDR_TO_PN(USER_MEM_HIGH)-start_pn>=npages){
+            return start_pn;
         }
     }  else{    // From high to low
-        if(list_empty(&map->vmm_list)){
-            return (USER_MEM_HIGH/PAGE_SIZE-npages);
+        size_t start_pn=ADDR_TO_PN(USER_MEM_HIGH);
+        size_t end_pn=0;
+        if(list_empty(&map->vmm_list)&&start_pn-npages>=ADDR_TO_PN(USER_MEM_LOW)){
+            return (start_pn-npages);
         }
 
-        // Check the last vmarea
-        vmarea_t *last_vmarea=list_item(map->vmm_list.l_prev,vmarea_t,vma_plink);
-
-        if(USER_MEM_HIGH/PAGE_SIZE-last_vmarea->vma_end>=npages){
-            return last_vmarea->vma_end; // TODO: I think the end is exlusive
-        }
-
-        // Initialize cur_vmare and pre_vmarea
-        vmarea_t *cur_vmarea=NULL;
-        vmarea_t *pre_vmarea=NULL;
-        // Check the middile vmarea
         list_iterate_reverse(&map->vmm_list,cur_vmarea,vmarea_t,vma_plink){
-            if(cur_vmarea!=NULL&&pre_vmarea!=NULL&&pre_vmarea->vma_start-cur_vmarea->vma_end>=npages){
+            end_pn=cur_vmarea->vma_end;
+            if(start_pn-cur_vmarea->vma_end>=npages){
                 return cur_vmarea->vma_end;
             }
-            pre_vmarea=cur_vmarea;
+            start_pn=cur_vmarea->vma_start;
         }
 
+        // If we still cannot find one available page
         // Check the first vmarea
-        if(cur_vmarea->vma_start-USER_MEM_LOW/PAGE_SIZE>=npages){
-            return cur_vmarea->vma_start-npages;
+        if(start_pn-ADDR_TO_PN(USER_MEM_LOW)>=npages){
+            return ADDR_TO_PN(USER_MEM_LOW);
         }
     }
     // NOT_YET_IMPLEMENTED("VM: vmmap_find_range");
