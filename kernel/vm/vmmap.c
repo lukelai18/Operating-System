@@ -140,8 +140,8 @@ void vmmap_insert(vmmap_t *map, vmarea_t *new_vma)
     // If we cannot find an appropriate place, we may insert it in the tail
     // end_pn=ADDR_TO_PN(USER_MEM_HIGH);
     // if(new_vma->vma_start>=start_pn&&new_vma->vma_end<=end_pn){
-        list_insert_tail(&map->vmm_list,&new_vma->vma_plink);
-        new_vma->vma_vmmap=map;
+    list_insert_tail(&map->vmm_list,&new_vma->vma_plink);
+    new_vma->vma_vmmap=map;
     // }
     // NOT_YET_IMPLEMENTED("VM: vmmap_insert");
 }
@@ -173,15 +173,15 @@ ssize_t vmmap_find_range(vmmap_t *map, size_t npages, int dir)
         
         list_iterate(&map->vmm_list,cur_vmarea,vmarea_t,vma_plink){
             end_pn=cur_vmarea->vma_start;
-            if(cur_vmarea->vma_start-start_pn>=npages){
+            if(end_pn-start_pn>=npages){
                 return start_pn;
             }
             start_pn=cur_vmarea->vma_end;
         }
 
         // If we cannot find a range in the map list, check the last address space
-        // end_pn=ADDR_TO_PN(USER_MEM_HIGH);
-        if(ADDR_TO_PN(USER_MEM_HIGH)-start_pn>=npages){
+        end_pn=ADDR_TO_PN(USER_MEM_HIGH);
+        if(end_pn-start_pn>=npages){
             return start_pn;
         }
     }  else{    // From high to low
