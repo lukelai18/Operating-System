@@ -128,7 +128,7 @@ void vmmap_insert(vmmap_t *map, vmarea_t *new_vma)
         // If we found we can insert it into one vmarea
         end_pn=cur_vmarea->vma_start;
         // If new vmarea can be inserted in front of this cur_vmarea
-        if(new_vma->vma_start>=start_pn&&new_vma->vma_end<end_pn){
+        if(new_vma->vma_start>=start_pn&&new_vma->vma_end<=end_pn){
             list_insert_before(&cur_vmarea->vma_plink,&new_vma->vma_plink);
             new_vma->vma_vmmap=map; // Update it's corresponding vmmap
             return;
@@ -139,7 +139,7 @@ void vmmap_insert(vmmap_t *map, vmarea_t *new_vma)
 
     // If we cannot find an appropriate place, we may insert it in the tail
     end_pn=ADDR_TO_PN(USER_MEM_HIGH);
-    if(new_vma->vma_start>=start_pn&&new_vma->vma_end<end_pn){
+    if(new_vma->vma_start>=start_pn&&new_vma->vma_end<=end_pn){
         list_insert_tail(&map->vmm_list,&new_vma->vma_plink);
         new_vma->vma_vmmap=map;
     }
@@ -164,16 +164,19 @@ ssize_t vmmap_find_range(vmmap_t *map, size_t npages, int dir)
     dbg(DBG_VM, "vmmap_find_range,the current map is %p, page size is %ld, the Mode is %d",map,npages,dir);
     // KASSERT(dir==VMMAP_DIR_HILO||dir==VMMAP_DIR_LOHI);
     // Check the begining
-    if(dir==VMMAP_DIR_LOHI){    // From low to high
-        if(list_empty(&map->vmm_list)){
-            return USER_MEM_LOW/PAGE_SIZE;
+    if(dir==VMMAP_DIR_LOHI){    // From low to high        
+        size_t start_pn=ADDR_TO_PN(USER_MEM_LOW);
+        size_t end_pn=0;
+        if(list_empty(&map->vmm_list)&&start_pn+npages<=ADDR_TO_PN(USER_MEM_HIGH)){
+            return start_pn;
         }
         
         // Check the first vmarea
         vmarea_t *first_vmarea=list_item(map->vmm_list.l_next,vmarea_t,vma_plink);
-        if(first_vmarea->vma_start-(USER_MEM_LOW/PAGE_SIZE)>=npages){
-            return USER_MEM_LOW/PAGE_SIZE;
+        if(first_vmarea->vma_start-ADDR_TO_PN(USER_MEM_LOW)>=npages){
+            return ADDR_TO_PN(USER_MEM_LOW);
         }
+
         // Initialize cur_vmare and pre_vmarea
         vmarea_t *cur_vmarea=NULL;
         vmarea_t *pre_vmarea=NULL;
@@ -187,7 +190,7 @@ ssize_t vmmap_find_range(vmmap_t *map, size_t npages, int dir)
         }
 
         // Check the last vmarea, cur_vmarea should be the last vmarea at this time
-        if(USER_MEM_HIGH/PAGE_SIZE-cur_vmarea->vma_end>=npages){
+        if(ADDR_TO_PN(USER_MEM_HIGH)-cur_vmarea->vma_end>=npages){
             return cur_vmarea->vma_end;
         }
     }  else{    // From high to low
