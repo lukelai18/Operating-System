@@ -392,7 +392,7 @@ long vmmap_map(vmmap_t *map, vnode_t *file, size_t lopage, size_t npages,
 
         mobj_unlock(old_mobj);
         new_mobj=sha_obj;
-        mobj_lock(new_mobj);
+        // mobj_lock(new_mobj);
 
         mobj_put(&old_mobj);
     }
