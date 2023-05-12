@@ -138,11 +138,11 @@ void vmmap_insert(vmmap_t *map, vmarea_t *new_vma)
     }
 
     // If we cannot find an appropriate place, we may insert it in the tail
-    end_pn=ADDR_TO_PN(USER_MEM_HIGH);
-    if(new_vma->vma_start>=start_pn&&new_vma->vma_end<=end_pn){
+    // end_pn=ADDR_TO_PN(USER_MEM_HIGH);
+    // if(new_vma->vma_start>=start_pn&&new_vma->vma_end<=end_pn){
         list_insert_tail(&map->vmm_list,&new_vma->vma_plink);
         new_vma->vma_vmmap=map;
-    }
+    // }
     // NOT_YET_IMPLEMENTED("VM: vmmap_insert");
 }
 
@@ -190,11 +190,11 @@ ssize_t vmmap_find_range(vmmap_t *map, size_t npages, int dir)
         if(list_empty(&map->vmm_list)&&start_pn-npages>=ADDR_TO_PN(USER_MEM_LOW)){
             return (start_pn-npages);
         }
-
+        
         list_iterate_reverse(&map->vmm_list,cur_vmarea,vmarea_t,vma_plink){
             end_pn=cur_vmarea->vma_end;
             if(start_pn-cur_vmarea->vma_end>=npages){
-                return cur_vmarea->vma_end;
+                return start_pn-npages;
             }
             start_pn=cur_vmarea->vma_start;
         }
@@ -202,7 +202,7 @@ ssize_t vmmap_find_range(vmmap_t *map, size_t npages, int dir)
         // If we still cannot find one available page
         // Check the first vmarea
         if(start_pn-ADDR_TO_PN(USER_MEM_LOW)>=npages){
-            return (start_pn-ADDR_TO_PN(USER_MEM_LOW));
+            return (start_pn-npages);
         }
     }
     // NOT_YET_IMPLEMENTED("VM: vmmap_find_range");
@@ -282,7 +282,8 @@ vmmap_t *vmmap_clone(vmmap_t *map)
         new_vmarea->vma_off=cur_vmarea->vma_off;
         new_vmarea->vma_prot=cur_vmarea->vma_prot;
         new_vmarea->vma_vmmap=new_map;
-       
+        new_vmarea->vma_obj=cur_vmarea->vma_obj;
+
         if(!(cur_vmarea->vma_flags&MAP_SHARED)){
              mobj_t* sha_map=shadow_create(cur_vmarea->vma_obj);
              mobj_t* sha_newmap=shadow_create(cur_vmarea->vma_obj);
