@@ -258,7 +258,7 @@ static long shadow_fill_pframe(mobj_t *o, pframe_t *pf)
         cur_o=MOBJ_TO_SO(cur_o)->shadowed;  // Update current mobj
     }
     // If none of the shadow object have a copy of the pframe, create a new one
-    long tmp=mobj_get_pframe(o,request_pagenum,1,&cur_pf);
+    long tmp=mobj_get_pframe(o,request_pagenum,0,&cur_pf);
     if(tmp<0){
         kmutex_unlock(&cur_pf->pf_mutex);
         return tmp;

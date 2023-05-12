@@ -571,11 +571,11 @@ long vmmap_read(vmmap_t *map, const void *vaddr, void *buf, size_t count)
             size_t needed_pagenum=0;
 
             // The written page num cannot beyond the range of this vmarea_t
-            if(cur_vmarea->vma_end-cur_off<(count-cur_read_bytes)/PAGE_SIZE+1){
+            if(cur_vmarea->vma_end-cur_off<ADDR_TO_PN(PAGE_ALIGN_UP(count-cur_read_bytes))){
                 needed_pagenum=cur_vmarea->vma_end-cur_off;
             }else{
                 // We don't need to read the entire PAGE
-                needed_pagenum=(count-cur_read_bytes)/PAGE_SIZE+1;
+                needed_pagenum=ADDR_TO_PN(PAGE_ALIGN_UP(count-cur_read_bytes));
             }
 
             for(size_t i=0;i<needed_pagenum;i++){
@@ -700,7 +700,7 @@ long vmmap_write(vmmap_t *map, void *vaddr, const void *buf, size_t count)
         // If the start page is inside cur_vmarea
         if(cur_vmarea->vma_start<=start_page&&cur_vmarea->vma_end>start_page){
             mobj_lock(cur_vmarea->vma_obj);     // Lock mobj firstly
-
+            
             // The current offset
             size_t cur_off=start_page-cur_vmarea->vma_start+cur_vmarea->vma_off;
             size_t needed_pagenum=0;
