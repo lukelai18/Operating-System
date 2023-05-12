@@ -33,7 +33,7 @@ void vmmap_init(void)
  */
 vmarea_t *vmarea_alloc(void)
 {
-    vmarea_t *new_vmarea=slab_obj_alloc(vmarea_allocator);
+    vmarea_t *new_vmarea=(vmarea_t *)slab_obj_alloc(vmarea_allocator);
 
     if(new_vmarea==NULL)    {
         return NULL;

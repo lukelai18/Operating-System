@@ -38,7 +38,7 @@ void anon_init()
  */
 mobj_t *anon_create()
 {
-    mobj_t *new_anon=slab_obj_alloc(anon_allocator);
+    mobj_t *new_anon=(mobj_t *)slab_obj_alloc(anon_allocator);
 
     if(new_anon==NULL){
         return NULL;
@@ -72,7 +72,7 @@ static long anon_flush_pframe(mobj_t *o, pframe_t *pf) { return 0; }
 static void anon_destructor(mobj_t *o)
 {
     mobj_default_destructor(o);
-    slab_obj_free(anon_allocator,o);
+    slab_obj_free(anon_allocator,(void *)o);
     // mobj_put(&o);
     // TODO: Not sure how to free
     // NOT_YET_IMPLEMENTED("VM: anon_destructor");

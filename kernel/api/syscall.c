@@ -160,6 +160,8 @@ static long sys_getdents(getdents_args_t *args)
     long ret1=copy_from_user(&kernel_args,args,sizeof(getdents_args_t));     // Copy from userland args
     ERROR_OUT_RET(ret1);
 
+    // TODO: Do we need to read at least one dirent_t?
+    // Or we didn't read it if it count_size is too small
     size_t count_size=kernel_args.count/sizeof(dirent_t);
     // At least one size of dirent_t
     if(count_size<1){

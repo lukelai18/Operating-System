@@ -50,27 +50,33 @@ void handle_pagefault(uintptr_t vaddr, uintptr_t cause)
     dbg(DBG_VM, "vaddr = 0x%p (0x%p), cause = %lu\n", (void *)vaddr,
         PAGE_ALIGN_DOWN(vaddr), cause);
 
+    KASSERT((cause&FAULT_USER)&&"Assert fault user is always set");
+
     vmarea_t *fault_vmarea=vmmap_lookup(curproc->p_vmmap,ADDR_TO_PN(vaddr));
     if(fault_vmarea==NULL){
         do_exit(EFAULT);    // Exit
+        panic("Cannot find vmarea");
     }
 
-    KASSERT((cause&FAULT_USER)&&"Assert fault user is always set");
     // Doesn't have Read Permission
     if(!(cause&FAULT_WRITE)&&!(cause&FAULT_EXEC)&&!(fault_vmarea->vma_prot&PROT_READ)){      // Attempt to read, but failed
         do_exit(EFAULT);
+        panic("Don't have read access");
     }
     // Doesn't have EXEC permission 
     if((cause&FAULT_EXEC)&&!(fault_vmarea->vma_prot&PROT_EXEC)){
         do_exit(EFAULT);
+        panic("Don't have execute access");
     }
     // Doesn't have WRITE permission
     if((cause&FAULT_WRITE)&&!(fault_vmarea->vma_prot&PROT_WRITE)){
         do_exit(EFAULT);
+        panic("Don't have write access");
     }
     // Doesn't have any permission
     if(fault_vmarea->vma_prot&PROT_NONE){
         do_exit(EFAULT);
+        panic("Don't have any access");
     }
     pframe_t *pf;
     // TODO: Check the vaddr
@@ -80,8 +86,9 @@ void handle_pagefault(uintptr_t vaddr, uintptr_t cause)
     if(tmp<0){
         mobj_unlock(fault_vmarea->vma_obj);
         do_exit(EFAULT);
+        panic("Cannot get pframe");
     }
-
+  
     int pdflags=PT_PRESENT | PT_WRITE | PT_USER;
     int ptflags=PT_PRESENT | PT_USER;
     if(cause&FAULT_WRITE){
