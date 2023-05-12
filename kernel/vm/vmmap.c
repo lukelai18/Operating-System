@@ -561,7 +561,7 @@ long vmmap_read(vmmap_t *map, const void *vaddr, void *buf, size_t count)
 
     size_t cur_read_bytes=0;  // Current wriitten bytes
     const void* cur_vaddr=vaddr; // Initialize current address
-    uintptr_t start_page=ADDR_TO_PN(vaddr); //  The start writing page
+    uintptr_t start_page=ADDR_TO_PN(vaddr); // The start writing page
 
     list_iterate(&map->vmm_list,cur_vmarea,vmarea_t,vma_plink){
         // If we found the required vmarea
@@ -702,7 +702,6 @@ long vmmap_write(vmmap_t *map, void *vaddr, const void *buf, size_t count)
         if(cur_vmarea->vma_start<=start_page&&cur_vmarea->vma_end>start_page){
             mobj_lock(cur_vmarea->vma_obj);     // Lock mobj firstly
             // The current offset
-            // TODO: Do I need to update start_page later?
             size_t cur_off=start_page-cur_vmarea->vma_start+cur_vmarea->vma_off;
             size_t needed_pagenum=0;
 

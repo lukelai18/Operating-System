@@ -80,7 +80,7 @@ mobj_t *shadow_create(mobj_t *shadowed)
     mobj_lock(&new_sha->mobj);
     // NOT_YET_IMPLEMENTED("VM: shadow_create");
     return &new_sha->mobj;
-    //return NULL;
+    // return NULL;
 }
 
 /*
@@ -213,7 +213,7 @@ static long shadow_get_pframe(mobj_t *o, size_t pagenum, long forwrite,
         *pfp=cur_pf;
     }
     // NOT_YET_IMPLEMENTED("VM: shadow_get_pframe");
-    return 0;
+     return 0;
 }
 
 /*
