@@ -73,10 +73,12 @@ mobj_t *shadow_create(mobj_t *shadowed)
     new_sha->shadowed=shadowed;
     if(shadowed->mo_type==MOBJ_SHADOW){ // If the shadowed is a shadow object
         new_sha->bottom_mobj=MOBJ_TO_SO(shadowed)->bottom_mobj;
+        mobj_ref(MOBJ_TO_SO(shadowed)->bottom_mobj);
     }else{              // If the shadowed is not a shadowed object
         new_sha->bottom_mobj=shadowed;
+        mobj_ref(shadowed);
     }
-    new_sha->mobj.mo_refcount+=2;   // Have the refcount to bottom_mobj and shadowed
+    // new_sha->mobj.mo_refcount+=2;   // Have the refcount to bottom_mobj and shadowed
     mobj_lock(&new_sha->mobj);
     // NOT_YET_IMPLEMENTED("VM: shadow_create");
     return &new_sha->mobj;
@@ -119,7 +121,7 @@ void shadow_collapse(mobj_t *o)
                 }
                 else{   // If the pframe is not NULL, which means that it exist on parent shadow object
                     pframe_release(&pf);        //  Unlock the pframe
-                    mobj_free_pframe(sha_o->shadowed,&cur_pf);    
+                    // mobj_free_pframe(sha_o->shadowed,&cur_pf);    
                 }
             }
             mobj_t *removed_mobj=sha_o->shadowed;   // Store the shadowed object need to be removed
@@ -189,7 +191,7 @@ static long shadow_get_pframe(mobj_t *o, size_t pagenum, long forwrite,
         mobj_t *cur_o=MOBJ_TO_SO(o)->shadowed;
         while(cur_o->mo_type==MOBJ_SHADOW){
             mobj_lock(cur_o);
-            // list_iterate(&cur_o->mo_pframes,pf,pframe_t,pf_link){
+
             // Check each shadowed object's page frame
             mobj_find_pframe(cur_o,pagenum,&cur_pf);
             if(cur_pf!=NULL){
@@ -197,14 +199,14 @@ static long shadow_get_pframe(mobj_t *o, size_t pagenum, long forwrite,
                 *pfp=cur_pf;
                 return 0;
             }
-            // }
+
             mobj_unlock(cur_o); // Unlock o before updating it
             cur_o=MOBJ_TO_SO(cur_o)->shadowed;
         }
    
         // If we still cannot find, and now cur_o has become the buttom object
         mobj_lock(cur_o);
-        long tmp=mobj_get_pframe(cur_o,pagenum,forwrite,&cur_pf);   // This one will lock pfp on return in any case
+        long tmp=mobj_get_pframe(cur_o,pagenum,forwrite,&cur_pf);   // This one will lock pfp on return when find it
         mobj_unlock(cur_o);
         if(tmp<0){         
             // kmutex_unlock(&cur_pf->pf_mutex);   
@@ -263,14 +265,12 @@ static long shadow_fill_pframe(mobj_t *o, pframe_t *pf)
     long tmp=mobj_get_pframe(cur_o,request_pagenum,0,&cur_pf);
     mobj_unlock(cur_o);
     if(tmp<0){
-        // pframe_release(&cur_pf);
-        // kmutex_unlock(&cur_pf->pf_mutex);
         return tmp;
     }
+    // If get it, copy it to pf
     memcpy(pf->pf_addr,cur_pf->pf_addr,PAGE_SIZE);
     pframe_release(&cur_pf);
-    // kmutex_unlock(&cur_pf->pf_mutex);
-    NOT_YET_IMPLEMENTED("VM: shadow_fill_pframe");
+    // NOT_YET_IMPLEMENTED("VM: shadow_fill_pframe");
     return 0;
 }
 
