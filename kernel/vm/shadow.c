@@ -189,15 +189,15 @@ static long shadow_get_pframe(mobj_t *o, size_t pagenum, long forwrite,
         mobj_t *cur_o=MOBJ_TO_SO(o)->shadowed;
         while(cur_o->mo_type==MOBJ_SHADOW){
             mobj_lock(cur_o);
-            list_iterate(&cur_o->mo_pframes,pf,pframe_t,pf_link){
+            // list_iterate(&cur_o->mo_pframes,pf,pframe_t,pf_link){
             // Check each shadowed object's page frame
-                mobj_find_pframe(cur_o,pagenum,&cur_pf);
-                if(cur_pf!=NULL){
-                    mobj_unlock(cur_o);
-                    *pfp=cur_pf;
-                    return 0;
-                }
+            mobj_find_pframe(cur_o,pagenum,&cur_pf);
+            if(cur_pf!=NULL){
+                mobj_unlock(cur_o);
+                *pfp=cur_pf;
+                return 0;
             }
+            // }
             mobj_unlock(cur_o); // Unlock o before updating it
             cur_o=MOBJ_TO_SO(cur_o)->shadowed;
         }
