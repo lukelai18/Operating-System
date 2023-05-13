@@ -112,7 +112,9 @@ void shadow_collapse(mobj_t *o)
             list_iterate(&sha_o->shadowed->mo_pframes,cur_pf,pframe_t,pf_link){
                 // Check if this pframe exist in parent shadow object
                 pframe_t *pf;
-                mobj_find_pframe(cur_o,cur_pf->pf_pagenum,&pf);   
+                mobj_lock(cur_o);
+                mobj_find_pframe(cur_o,cur_pf->pf_pagenum,&pf); 
+                mobj_unlock(cur_o);  
                 // If the pframe is NULL
                 if(pf==NULL){   // If we cannot find it in parent shadow object, we should migrate it 
                     list_remove(&cur_pf->pf_link);  // Remove current pframe from its list on shadowed object
@@ -132,6 +134,7 @@ void shadow_collapse(mobj_t *o)
             // If we cannot remove it, update current mobj and sha_o
             cur_o=sha_o->shadowed; 
             sha_o=MOBJ_TO_SO(cur_o);
+            // TODO: Double check it
         }
         // Update mobj and shadow object
     }
