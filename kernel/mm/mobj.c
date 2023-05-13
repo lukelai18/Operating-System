@@ -95,6 +95,7 @@ void mobj_find_pframe(mobj_t *o, uint64_t pagenum, pframe_t **pfp)
     {
         if (pf->pf_pagenum == pagenum)
         {
+            KASSERT(!kmutex_owns_mutex(&pf->pf_mutex));
             kmutex_lock(&pf->pf_mutex);
             *pfp = pf;
             return;
