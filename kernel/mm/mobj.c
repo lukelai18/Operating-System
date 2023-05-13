@@ -66,7 +66,7 @@ void mobj_put_locked(mobj_t **op)
 void mobj_put(mobj_t **op)
 {
     mobj_t *o = *op;
-    KASSERT(o->mo_refcount);
+    KASSERT(o->mo_refcount&&"Make sure its refcount is not 0");
     *op = NULL;
 
     dbg(DBG_ERROR, "count: %d\n", o->mo_refcount);
