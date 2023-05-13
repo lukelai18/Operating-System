@@ -108,7 +108,7 @@ void shadow_collapse(mobj_t *o)
         // If its shadow object only has 1 refcount
         // Previous one call find pframe
        if(sha_o->shadowed->mo_refcount==1){
-            mobj_lock(sha_o->shadowed);
+            // mobj_lock(sha_o->shadowed);
             list_iterate(&sha_o->shadowed->mo_pframes,cur_pf,pframe_t,pf_link){
                 // Check if this pframe exist in parent shadow object
                 pframe_t *pf;
@@ -126,10 +126,12 @@ void shadow_collapse(mobj_t *o)
                     // mobj_free_pframe(sha_o->shadowed,&cur_pf);    
                 }
             }
+
             mobj_t *removed_mobj=sha_o->shadowed;   // Store the shadowed object need to be removed
             sha_o->shadowed=MOBJ_TO_SO(sha_o->shadowed)->shadowed;  // Update its shadowed object
             mobj_ref(sha_o->shadowed);  // Increase the reference of its new shadow object
-            mobj_put_locked(&removed_mobj);
+            mobj_put(&removed_mobj);
+
         } else{
             // If we cannot remove it, update current mobj and sha_o
             cur_o=sha_o->shadowed; 
