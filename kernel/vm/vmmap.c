@@ -583,7 +583,8 @@ long vmmap_read(vmmap_t *map, const void *vaddr, void *buf, size_t count)
                 // Get the required page frame
                 long tmp=mobj_get_pframe(cur_vmarea->vma_obj,cur_off+i,1,&pf);
                 if(tmp<0){
-                    kmutex_unlock(&pf->pf_mutex);
+                    // pframe_release(&pf);
+                    // kmutex_unlock(&pf->pf_mutex);
                     mobj_unlock(cur_vmarea->vma_obj);
                     return tmp;
                 }
@@ -607,8 +608,9 @@ long vmmap_read(vmmap_t *map, const void *vaddr, void *buf, size_t count)
                 cur_read_bytes+=this_page_read_bytes;
                 buf=(char *)buf+cur_read_bytes;
                 cur_vaddr=(char *)cur_vaddr+this_page_read_bytes;
-            
-                kmutex_unlock(&pf->pf_mutex);
+                
+                pframe_release(&pf);
+                // kmutex_unlock(&pf->pf_mutex);
             }
             mobj_unlock(cur_vmarea->vma_obj);
             return 0;
@@ -719,7 +721,8 @@ long vmmap_write(vmmap_t *map, void *vaddr, const void *buf, size_t count)
                 // Get the required page frame
                 long tmp=mobj_get_pframe(cur_vmarea->vma_obj,cur_off+i,1,&pf);
                 if(tmp<0){
-                    kmutex_unlock(&pf->pf_mutex);
+                    // pframe_release(&pf);
+                    // kmutex_unlock(&pf->pf_mutex);
                     mobj_unlock(cur_vmarea->vma_obj);
                     return tmp;
                 }
@@ -743,7 +746,8 @@ long vmmap_write(vmmap_t *map, void *vaddr, const void *buf, size_t count)
                 buf=(char *)buf+cur_write_bytes;
                 cur_vaddr=(char *)cur_vaddr+this_page_write_bytes;
             
-                kmutex_unlock(&pf->pf_mutex);
+                pframe_release(&pf);
+                // kmutex_unlock(&pf->pf_mutex);
             }
             mobj_unlock(cur_vmarea->vma_obj);
             return 0;

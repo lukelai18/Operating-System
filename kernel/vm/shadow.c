@@ -206,7 +206,7 @@ static long shadow_get_pframe(mobj_t *o, size_t pagenum, long forwrite,
         mobj_lock(cur_o);
         long tmp=mobj_get_pframe(cur_o,pagenum,forwrite,&cur_pf);   // This one will lock pfp on return in any case
         mobj_unlock(cur_o);
-        if(tmp<0){
+        if(tmp<0){         
             // kmutex_unlock(&cur_pf->pf_mutex);   
             return tmp;
         }
@@ -249,7 +249,8 @@ static long shadow_fill_pframe(mobj_t *o, pframe_t *pf)
         // If we found the page frame
         if(cur_pf!=NULL){
             memcpy(pf->pf_addr,cur_pf->pf_addr,PAGE_SIZE);  // Copy its content into pf
-            kmutex_unlock(&cur_pf->pf_mutex);
+            pframe_release(&cur_pf);
+            // kmutex_unlock(&cur_pf->pf_mutex);
             mobj_unlock(cur_o);
             return 0;
         }
@@ -260,11 +261,13 @@ static long shadow_fill_pframe(mobj_t *o, pframe_t *pf)
     // If none of the shadow object have a copy of the pframe, create a new one
     long tmp=mobj_get_pframe(o,request_pagenum,0,&cur_pf);
     if(tmp<0){
-        kmutex_unlock(&cur_pf->pf_mutex);
+        // pframe_release(&cur_pf);
+        // kmutex_unlock(&cur_pf->pf_mutex);
         return tmp;
     }
     memcpy(pf->pf_addr,cur_pf->pf_addr,PAGE_SIZE);
-    kmutex_unlock(&cur_pf->pf_mutex);
+    pframe_release(&cur_pf);
+    // kmutex_unlock(&cur_pf->pf_mutex);
     NOT_YET_IMPLEMENTED("VM: shadow_fill_pframe");
     return 0;
 }
