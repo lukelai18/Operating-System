@@ -577,7 +577,7 @@ long vmmap_read(vmmap_t *map, const void *vaddr, void *buf, size_t count)
     size_t cur_vaddr=(size_t)vaddr; // Initialize current address
     size_t end_vaddr=(size_t)vaddr+count;
     uintptr_t cur_page=ADDR_TO_PN(cur_vaddr); // The start reading page
-    uintptr_t end_page=ADDR_TO_PN(cur_vaddr+count);
+    uintptr_t end_page=ADDR_TO_PN(PAGE_ALIGN_UP(cur_vaddr+count));
 
     while(cur_page<end_page){       
         vmarea_t *vma=vmmap_lookup(map,cur_page);
@@ -692,7 +692,7 @@ long vmmap_write(vmmap_t *map, void *vaddr, const void *buf, size_t count)
     size_t cur_vaddr=(size_t)vaddr; // Initialize current address
     size_t end_vaddr=(size_t)vaddr+count;
     uintptr_t cur_page=ADDR_TO_PN(cur_vaddr); // The start reading page
-    uintptr_t end_page=ADDR_TO_PN(cur_vaddr+count);
+    uintptr_t end_page=ADDR_TO_PN(PAGE_ALIGN_UP(cur_vaddr+count));
     
     while(cur_page<end_page){       
         vmarea_t *vma=vmmap_lookup(map,cur_page);
