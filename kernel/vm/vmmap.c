@@ -262,8 +262,9 @@ void vmmap_collapse(vmmap_t *map)
 vmmap_t *vmmap_clone(vmmap_t *map)
 {
     dbg(DBG_VM,"vmmap_clone, the current map is %p \n",map);
-    vmmap_t *new_map=vmmap_create();
+    vmmap_collapse(map);
 
+    vmmap_t *new_map=vmmap_create();
     if(new_map== NULL){
         return NULL;
     }
@@ -281,20 +282,22 @@ vmmap_t *vmmap_clone(vmmap_t *map)
         new_vmarea->vma_prot=cur_vmarea->vma_prot;
         new_vmarea->vma_vmmap=new_map;
         new_vmarea->vma_obj=cur_vmarea->vma_obj;
+        mobj_ref(new_vmarea->vma_obj);
+        vmmap_insert(new_map,new_vmarea);
 
         if(!(cur_vmarea->vma_flags&MAP_SHARED)){
              mobj_t* sha_map=shadow_create(cur_vmarea->vma_obj);
-             mobj_t* sha_newmap=shadow_create(cur_vmarea->vma_obj);
+             mobj_t* sha_newmap=shadow_create(new_vmarea->vma_obj);
              mobj_put(&cur_vmarea->vma_obj);
+             mobj_put(&new_vmarea);
              // Insert into vmarea 
              cur_vmarea->vma_obj=sha_map;
-             mobj_ref(sha_map);
              mobj_unlock(sha_map);
+             
              new_vmarea->vma_obj=sha_newmap;   
-             mobj_ref(sha_newmap);
              mobj_unlock(sha_newmap);
         }
-        list_insert_tail(&new_map->vmm_list,&new_vmarea->vma_plink);
+        // list_insert_tail(&new_map->vmm_list,&new_vmarea->vma_plink);
     }
 
     // NOT_YET_IMPLEMENTED("VM: vmmap_clone");

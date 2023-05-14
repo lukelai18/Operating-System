@@ -131,12 +131,10 @@ void shadow_collapse(mobj_t *o)
                     // mobj_free_pframe(sha_o->shadowed,&cur_pf);    
                 }
             }
-
             // mobj_t *removed_mobj=cur_o;   // Store the shadowed object need to be removed
             MOBJ_TO_SO(par_o)->shadowed=MOBJ_TO_SO(cur_o)->shadowed;  // Update parent's shadowed object
             mobj_ref(MOBJ_TO_SO(cur_o)->shadowed);  // Increase the reference of its new shadow object
             mobj_put(&cur_o);
-
         } else{
             // If we cannot remove it, update par_o and cur_o to the next one
             par_o=cur_o;
@@ -200,16 +198,14 @@ static long shadow_get_pframe(mobj_t *o, size_t pagenum, long forwrite,
         mobj_t *cur_o=MOBJ_TO_SO(o)->shadowed;
         while(cur_o->mo_type==MOBJ_SHADOW){
             mobj_lock(cur_o);
-
             // Check each shadowed object's page frame
             mobj_find_pframe(cur_o,pagenum,&cur_pf);
+            mobj_unlock(cur_o); // Unlock o before updating it
             if(cur_pf!=NULL){
-                mobj_unlock(cur_o);
                 *pfp=cur_pf;
                 return 0;
             }
 
-            mobj_unlock(cur_o); // Unlock o before updating it
             cur_o=MOBJ_TO_SO(cur_o)->shadowed;
         }
    
@@ -218,7 +214,6 @@ static long shadow_get_pframe(mobj_t *o, size_t pagenum, long forwrite,
         long tmp=mobj_get_pframe(cur_o,pagenum,forwrite,&cur_pf);   // This one will lock pfp on return when find it
         mobj_unlock(cur_o);
         if(tmp<0){         
-            // kmutex_unlock(&cur_pf->pf_mutex);   
             return tmp;
         }
         *pfp=cur_pf;
@@ -257,18 +252,17 @@ static long shadow_fill_pframe(mobj_t *o, pframe_t *pf)
     while(cur_o->mo_type==MOBJ_SHADOW){
         mobj_lock(cur_o);   // Lock current mobj
         mobj_find_pframe(cur_o,request_pagenum,&cur_pf);
+        mobj_unlock(cur_o);
         // If we found the page frame
         if(cur_pf!=NULL){
             memcpy(pf->pf_addr,cur_pf->pf_addr,PAGE_SIZE);  // Copy its content into pf
             pframe_release(&cur_pf);
             // kmutex_unlock(&cur_pf->pf_mutex);
-            mobj_unlock(cur_o);
             return 0;
-        }
-        mobj_unlock(cur_o);
-
+        }        
         cur_o=MOBJ_TO_SO(cur_o)->shadowed;  // Update current mobj
     }
+    
     // If none of the shadow object have a copy of the pframe, get it on the bottom object
     mobj_lock(cur_o);
     long tmp=mobj_get_pframe(cur_o,request_pagenum,0,&cur_pf);
