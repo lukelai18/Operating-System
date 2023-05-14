@@ -57,41 +57,41 @@ static uintptr_t fork_setup_stack(const regs_t *regs, void *kstack)
  */
 long do_fork(struct regs *regs)
 {
-    proc_t* child_proc=proc_create("new_process");
+    // proc_t* child_proc=proc_create("new_process");
 
-    if(child_proc==NULL){
-        curthr->kt_errno=ENOMEM;
-        return -1;
-    }
+    // if(child_proc==NULL){
+    //     curthr->kt_errno=ENOMEM;
+    //     return -1;
+    // }
   
-    kthread_t *new_thr=kthread_clone(curthr);
-    if(new_thr==NULL){
-        proc_destroy(child_proc);    
-        curthr->kt_errno=ENOMEM;
-        return -1;
-    }
-    list_insert_tail(&child_proc->p_threads,&new_thr->kt_plink);
-    new_thr->kt_proc=child_proc;
+    // kthread_t *new_thr=kthread_clone(curthr);
+    // if(new_thr==NULL){
+    //     proc_destroy(child_proc);    
+    //     curthr->kt_errno=ENOMEM;
+    //     return -1;
+    // }
+    // list_insert_tail(&child_proc->p_threads,&new_thr->kt_plink);
+    // new_thr->kt_proc=child_proc;
 
-    regs->r_rax=0;  // Set return value to 0 before copying to child process's stack 
-    new_thr->kt_ctx.c_rsp=fork_setup_stack(regs,new_thr->kt_kstack);
+    // regs->r_rax=0;  // Set return value to 0 before copying to child process's stack 
+    // new_thr->kt_ctx.c_rsp=fork_setup_stack(regs,new_thr->kt_kstack);
 
-    // Instruction pointer should point to userland_entry
-    new_thr->kt_ctx.c_kstack=(uintptr_t)new_thr->kt_kstack;
-    new_thr->kt_ctx.c_kstacksz=DEFAULT_STACK_SIZE;
-    new_thr->kt_ctx.c_rip=(uintptr_t)userland_entry;
+    // // Instruction pointer should point to userland_entry
+    // new_thr->kt_ctx.c_kstack=(uintptr_t)new_thr->kt_kstack;
+    // new_thr->kt_ctx.c_kstacksz=DEFAULT_STACK_SIZE;
+    // new_thr->kt_ctx.c_rip=(uintptr_t)userland_entry;
 
-    new_thr->kt_ctx.c_pml4=child_proc->p_pml4;
+    // new_thr->kt_ctx.c_pml4=child_proc->p_pml4;
 
-    regs->r_rax=child_proc->p_pid;  // Set the regs return value to child process's return ID
+    // regs->r_rax=child_proc->p_pid;  // Set the regs return value to child process's return ID
 
-    // Use them at parent
-    pt_unmap_range(curproc->p_pml4,USER_MEM_LOW,USER_MEM_HIGH);
-    tlb_flush_all();
+    // // Use them at parent
+    // pt_unmap_range(curproc->p_pml4,USER_MEM_LOW,USER_MEM_HIGH);
+    // tlb_flush_all();
 
-    sched_make_runnable(new_thr);   // Make the child process's thread runable
+    // sched_make_runnable(new_thr);   // Make the child process's thread runable
 
-    // NOT_YET_IMPLEMENTED("VM: do_fork");
-    return child_proc->p_pid;
+    // // NOT_YET_IMPLEMENTED("VM: do_fork");
+    // return child_proc->p_pid;
     return -1;
 }

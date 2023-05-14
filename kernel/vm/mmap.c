@@ -60,53 +60,53 @@
 long do_mmap(void *addr, size_t len, int prot, int flags, int fd, off_t off,
              void **ret)
 {
-    if(!PAGE_ALIGNED(addr)&&flags&MAP_FIXED){
-        return -EINVAL;
-    }
-    if(!PAGE_ALIGNED(off)){
-        return -EINVAL;
-    }
-    if(len<=0||off<0){
-        return -EINVAL;
-    }
-    if(!(flags&MAP_PRIVATE)&&!(flags&MAP_SHARED)){
-        return -EINVAL;
-    }
-    // Avoid len too long or addr is greater than USER_MEM_HIGH
-    if((flags&MAP_FIXED)&&((len>USER_MEM_HIGH-(size_t)addr)||(size_t)addr>USER_MEM_HIGH)){
-        return -EINVAL;
-    }
-    if(!(flags&MAP_ANON)&&(fd<0||fd>=NFILES)){
-        return -EBADF;
-    }
-    // Mmap operation doesn't exist
-    if(curproc->p_files[fd]->f_vnode->vn_ops->mmap==NULL){
-        return -ENODEV;
-    }
-    if((prot&PROT_WRITE)&&(curproc->p_files[fd]->f_mode&FMODE_APPEND)){
-        return -EACCES;
-    }
-    if((prot&PROT_WRITE)&&(flags&MAP_SHARED)&&!(curproc->p_files[fd]->f_mode&(FMODE_READ|FMODE_WRITE))){
-        return -EACCES;
-    }
-    // Maping was request
-    // TODO: I think maping flag is checked previously, so we don't need to check it again
-    if(!curproc->p_files[fd]->f_mode&FMODE_READ){
-        return -EACCES;
-    }
-    vmarea_t *new_vma;
-    // Using page align up can handle the case when len is less than 1 page
-    long tmp=vmmap_map(curproc->p_vmmap,curproc->p_files[fd]->f_vnode,ADDR_TO_PN(addr),
-        (size_t)PAGE_ALIGN_UP(len)/PAGE_SIZE,prot,flags,off,VMMAP_DIR_HILO,&new_vma);
-    if(tmp<0){
-        return tmp;
-    }
+    // if(!PAGE_ALIGNED(addr)&&flags&MAP_FIXED){
+    //     return -EINVAL;
+    // }
+    // if(!PAGE_ALIGNED(off)){
+    //     return -EINVAL;
+    // }
+    // if(len<=0||off<0){
+    //     return -EINVAL;
+    // }
+    // if(!(flags&MAP_PRIVATE)&&!(flags&MAP_SHARED)){
+    //     return -EINVAL;
+    // }
+    // // Avoid len too long or addr is greater than USER_MEM_HIGH
+    // if((flags&MAP_FIXED)&&((len>USER_MEM_HIGH-(size_t)addr)||(size_t)addr>USER_MEM_HIGH)){
+    //     return -EINVAL;
+    // }
+    // if(!(flags&MAP_ANON)&&(fd<0||fd>=NFILES)){
+    //     return -EBADF;
+    // }
+    // // Mmap operation doesn't exist
+    // if(curproc->p_files[fd]->f_vnode->vn_ops->mmap==NULL){
+    //     return -ENODEV;
+    // }
+    // if((prot&PROT_WRITE)&&(curproc->p_files[fd]->f_mode&FMODE_APPEND)){
+    //     return -EACCES;
+    // }
+    // if((prot&PROT_WRITE)&&(flags&MAP_SHARED)&&!(curproc->p_files[fd]->f_mode&(FMODE_READ|FMODE_WRITE))){
+    //     return -EACCES;
+    // }
+    // // Maping was request
+    // // TODO: I think maping flag is checked previously, so we don't need to check it again
+    // if(!curproc->p_files[fd]->f_mode&FMODE_READ){
+    //     return -EACCES;
+    // }
+    // vmarea_t *new_vma;
+    // // Using page align up can handle the case when len is less than 1 page
+    // long tmp=vmmap_map(curproc->p_vmmap,curproc->p_files[fd]->f_vnode,ADDR_TO_PN(addr),
+    //     (size_t)PAGE_ALIGN_UP(len)/PAGE_SIZE,prot,flags,off,VMMAP_DIR_HILO,&new_vma);
+    // if(tmp<0){
+    //     return tmp;
+    // }
 
-    tlb_flush_range((uintptr_t)PN_TO_ADDR(new_vma->vma_start),
-        (size_t)PAGE_ALIGN_UP(len)/PAGE_SIZE);
-    *ret=PN_TO_ADDR(new_vma->vma_start);
+    // tlb_flush_range((uintptr_t)PN_TO_ADDR(new_vma->vma_start),
+    //     (size_t)PAGE_ALIGN_UP(len)/PAGE_SIZE);
+    // *ret=PN_TO_ADDR(new_vma->vma_start);
 
-    // NOT_YET_IMPLEMENTED("VM: do_mmap");
+    // // NOT_YET_IMPLEMENTED("VM: do_mmap");
     return 0;
 }
 
@@ -129,19 +129,19 @@ long do_mmap(void *addr, size_t len, int prot, int flags, int fd, off_t off,
  */
 long do_munmap(void *addr, size_t len)
 {
-    if(len==0){
-        return -EINVAL;
-    }
-    if(!PAGE_ALIGNED(addr)){
-        return -EINVAL;
-    }
-    if((size_t)addr<USER_MEM_LOW||(size_t)addr+len>USER_MEM_HIGH){
-        return -EINVAL;
-    }
+    // if(len==0){
+    //     return -EINVAL;
+    // }
+    // if(!PAGE_ALIGNED(addr)){
+    //     return -EINVAL;
+    // }
+    // if((size_t)addr<USER_MEM_LOW||(size_t)addr+len>USER_MEM_HIGH){
+    //     return -EINVAL;
+    // }
 
-    long tmp=vmmap_remove(curproc->p_vmmap,ADDR_TO_PN(addr),(size_t)PAGE_ALIGN_UP(len)/PAGE_SIZE);
+    // long tmp=vmmap_remove(curproc->p_vmmap,ADDR_TO_PN(addr),(size_t)PAGE_ALIGN_UP(len)/PAGE_SIZE);
 
-    // NOT_YET_IMPLEMENTED("VM: do_munmap");
-    return tmp;
+    // // NOT_YET_IMPLEMENTED("VM: do_munmap");
+    // return tmp;
     return 0;
 }
