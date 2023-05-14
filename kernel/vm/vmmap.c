@@ -388,10 +388,11 @@ long vmmap_map(vmmap_t *map, vnode_t *file, size_t lopage, size_t npages,
         mobj_t *old_mobj=new_mobj;  // Store the previous mobj and unlock it
 
         new_mobj=sha_obj;   // It has been locked in shadow_create
-        mobj_ref(sha_obj);
-        mobj_put(&old_mobj);  
+        // mobj_ref(sha_obj);  // Ref the shadow obj
 
-        mobj_unlock(sha_obj);
+        mobj_put(&old_mobj);  // Put the previous mobj
+
+        mobj_unlock(sha_obj);   // Unlock the created shadow object
     }
 
     // Initialize the new vmarea_t
@@ -405,7 +406,7 @@ long vmmap_map(vmmap_t *map, vnode_t *file, size_t lopage, size_t npages,
     new->vma_prot=prot;
     new->vma_vmmap=map;
     new->vma_obj=new_mobj;
-    // mobj_ref(new_mobj);
+    mobj_ref(new_mobj);
 
     new->vma_off=ADDR_TO_PN(off);
     
