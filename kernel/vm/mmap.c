@@ -69,39 +69,59 @@ long do_mmap(void *addr, size_t len, int prot, int flags, int fd, off_t off,
         if(file==NULL){
             return -EACCES;
         }
+        if(file->f_vnode->vn_ops->mmap==NULL){
+            fput(&file);
+            return -ENODEV;
+        }
+        if((prot&PROT_WRITE)&&(file->f_mode&FMODE_APPEND)){
+            fput(&file);
+            return -EACCES;
+        }
+        if((prot&PROT_WRITE)&&(flags&MAP_SHARED)&&!(file->f_mode&(FMODE_READ|FMODE_WRITE))){
+            fput(&file);
+            return -EACCES;
+        }
+        // Maping was request
+        // TODO: I think maping flag is checked previously, so we don't need to check it again
+        if(!file->f_mode&FMODE_READ){
+            fput(&file);
+            return -EACCES;
+        }
     }
     if(!PAGE_ALIGNED(addr)&&flags&MAP_FIXED){
+        if(file!=NULL){
+            fput(&file);
+        }
         return -EINVAL;
     }
     if(!PAGE_ALIGNED(off)){
+        if(file!=NULL){
+            fput(&file);
+        }
         return -EINVAL;
     }
     if(len<=0||off<0){
+        if(file!=NULL){
+            fput(&file);
+        }
         return -EINVAL;
     }
     if(!(flags&MAP_PRIVATE)&&!(flags&MAP_SHARED)){
+        if(file!=NULL){
+            fput(&file);
+        }
         return -EINVAL;
     }
     // Avoid len too long or addr is greater than USER_MEM_HIGH
     if((flags&MAP_FIXED)&&((size_t)addr<USER_MEM_LOW||(size_t)addr>USER_MEM_HIGH||
         (size_t)addr+len>USER_MEM_HIGH||(size_t)addr+len<USER_MEM_LOW||len>USER_MEM_HIGH)){
+        if(file!=NULL){
+            fput(&file);
+        }    
         return -EINVAL;
     }
     // Mmap operation doesn't exist
-    if(file->f_vnode->vn_ops->mmap==NULL){
-        return -ENODEV;
-    }
-    if((prot&PROT_WRITE)&&(file->f_mode&FMODE_APPEND)){
-        return -EACCES;
-    }
-    if((prot&PROT_WRITE)&&(flags&MAP_SHARED)&&!(file->f_mode&(FMODE_READ|FMODE_WRITE))){
-        return -EACCES;
-    }
-    // Maping was request
-    // TODO: I think maping flag is checked previously, so we don't need to check it again
-    if(!file->f_mode&FMODE_READ){
-        return -EACCES;
-    }
+
     vmarea_t *new_vma;
     // Using page align up can handle the case when len is less than 1 page
     size_t lopage=ADDR_TO_PN(addr);
@@ -110,13 +130,20 @@ long do_mmap(void *addr, size_t len, int prot, int flags, int fd, off_t off,
     long tmp=vmmap_map(curproc->p_vmmap,file->f_vnode,lopage,npages,
         prot,flags,off,VMMAP_DIR_HILO,&new_vma);
     if(tmp<0){
+        if(file!=NULL){
+            fput(&file);
+        }   
         return tmp;
     }
 
-    tlb_flush_range((uintptr_t)PN_TO_ADDR(PAGE_ALIGN_DOWN(new_vma->vma_start)),
-        npages);
-    *ret=PN_TO_ADDR(new_vma->vma_start);
+    tlb_flush_range((uintptr_t)PAGE_ALIGN_DOWN(addr),npages);
+    if(ret!=NULL){
+        *ret=PN_TO_ADDR(new_vma->vma_start);
+    } 
 
+    if(file!=NULL){
+        fput(&file);
+    }   
     // NOT_YET_IMPLEMENTED("VM: do_mmap");
     return 0;
 }
