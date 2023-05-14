@@ -356,26 +356,24 @@ long vmmap_map(vmmap_t *map, vnode_t *file, size_t lopage, size_t npages,
         if(new_mobj==NULL){
             return -ENOMEM;
         }
+        mobj_unlock(new_mobj);
     } else{
         long tmp=file->vn_ops->mmap(file,&new_mobj);    // Obtain the memory object
         if(tmp<0){
             return tmp;
         }
-        mobj_lock(new_mobj);
     }
 
     ssize_t start_pagenum=lopage;   // Get the start range and mapping
     if(lopage==0){
         start_pagenum =vmmap_find_range(map,npages,dir); // Get a new range
         if(start_pagenum<0){    // Error checking
-            mobj_unlock(new_mobj);
             return -ENOMEM;
         }
     } else if(lopage!=0&&(flags&MAP_FIXED)&&!vmmap_is_range_empty(map,start_pagenum,npages)){
         // Remove the prexisiting mappings if there are any overlaps
-        long tmp=vmmap_remove(map,lopage,npages);   // 
+        long tmp=vmmap_remove(map,start_pagenum,npages);   // 
         if(tmp<0){
-            mobj_unlock(new_mobj);
             return tmp;
         }
     }
@@ -383,30 +381,29 @@ long vmmap_map(vmmap_t *map, vnode_t *file, size_t lopage, size_t npages,
     if(flags&MAP_PRIVATE){
         mobj_t *sha_obj=shadow_create(new_mobj);    // Will be locked here
         
-        if(sha_obj==NULL){
-            mobj_unlock(new_mobj);           
+        if(sha_obj==NULL){          
             return -ENOMEM;
         }
 
         mobj_t *old_mobj=new_mobj;  // Store the previous mobj and unlock it
-        mobj_unlock(old_mobj);
 
         new_mobj=sha_obj;   // It has been locked in shadow_create
+        mobj_ref(sha_obj);
+        mobj_put(&old_mobj);  
 
-        mobj_put(&old_mobj);    
+        mobj_unlock(sha_obj);
     }
 
     // Initialize the new vmarea_t
     vmarea_t *new=vmarea_alloc();
     if(new==NULL){
-        mobj_unlock(new_mobj);
         return -ENOMEM;
     }
     new->vma_start=start_pagenum;
     new->vma_end=start_pagenum+npages;
     new->vma_flags=flags;
     new->vma_prot=prot;
-
+    new->vma_vmmap=map;
     new->vma_obj=new_mobj;
     // mobj_ref(new_mobj);
 
@@ -417,7 +414,6 @@ long vmmap_map(vmmap_t *map, vnode_t *file, size_t lopage, size_t npages,
         *new_vma=new;
     }
 
-    mobj_unlock(new_mobj);
     // NOT_YET_IMPLEMENTED("VM: vmmap_map");
     return 0;
 }
