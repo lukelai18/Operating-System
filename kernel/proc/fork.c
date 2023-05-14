@@ -74,16 +74,16 @@ long do_fork(struct regs *regs)
     new_thr->kt_proc=child_proc;
 
     regs->r_rax=0;  // Set return value to 0 before copying to child process's stack 
-    new_thr->kt_ctx.c_rsp=fork_setup_stack(regs,new_thr->kt_kstack);
 
     // Instruction pointer should point to userland_entry
-    new_thr->kt_ctx.c_kstack=(uintptr_t)new_thr->kt_kstack;
-    new_thr->kt_ctx.c_kstacksz=DEFAULT_STACK_SIZE;
+    // new_thr->kt_ctx.c_kstack=(uintptr_t)new_thr->kt_kstack;
+    // new_thr->kt_ctx.c_kstacksz=DEFAULT_STACK_SIZE;
     new_thr->kt_ctx.c_rip=(uintptr_t)userland_entry;
 
     new_thr->kt_ctx.c_pml4=child_proc->p_pml4;
 
-    regs->r_rax=child_proc->p_pid;  // Set the regs return value to child process's return ID
+    new_thr->kt_ctx.c_rsp=fork_setup_stack(regs,new_thr->kt_kstack);
+    // regs->r_rax=child_proc->p_pid;  // Set the regs return value to child process's return ID
 
     // Use them at parent
     pt_unmap_range(curproc->p_pml4,USER_MEM_LOW,USER_MEM_HIGH);

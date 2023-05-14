@@ -116,23 +116,24 @@ kthread_t *kthread_clone(kthread_t *thr)
         return NULL;
     }
 
-    spinlock_lock(&thr->kt_lock);
+    // spinlock_lock(&thr->kt_lock);
     new_thr->kt_kstack=alloc_stack();
     if(new_thr->kt_kstack==NULL){
-        spinlock_unlock(&thr->kt_lock);
+        // spinlock_unlock(&thr->kt_lock);
         slab_obj_free(kthread_allocator,new_thr);
         return NULL;
     }
     
     // Initialize context
-    new_thr->kt_ctx.c_kstack=thr->kt_ctx.c_kstack;
-    new_thr->kt_ctx.c_kstacksz=thr->kt_ctx.c_kstacksz;
+    new_thr->kt_kstack=alloc_stack();
+    new_thr->kt_ctx.c_kstack=(uintptr_t)new_thr->kt_kstack;
+    new_thr->kt_ctx.c_kstacksz=DEFAULT_STACK_SIZE;
     
     // Initialize retval, errno, cancelled
     new_thr->kt_retval=thr->kt_retval;
     new_thr->kt_errno=thr->kt_errno;
     new_thr->kt_cancelled=thr->kt_cancelled;
-    spinlock_unlock(&thr->kt_lock);
+    // spinlock_unlock(&thr->kt_lock);
 
     // Initialize other part
     spinlock_init(&new_thr->kt_lock); // Initialize the spinlock
