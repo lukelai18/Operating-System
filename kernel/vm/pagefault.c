@@ -97,7 +97,7 @@ void handle_pagefault(uintptr_t vaddr, uintptr_t cause)
     // uintptr_t phy_addr= pt_virt_to_phys((uintptr_t)pf->pf_addr);
     // Create a relation between the virtual address with the page map inside the file
     // Like, page 10-11 may be mapped to the page 0 inside the file
-    dbg(DBG_VM,"Verify we get here");
+    dbg(DBG_VM,"Verify we get her\n");
     long tmp2=pt_map(curproc->p_pml4,pt_virt_to_phys((uintptr_t)pf->pf_addr),(uintptr_t)PAGE_ALIGN_DOWN(vaddr),pdflags,ptflags);
     if(tmp<0){
         pframe_release(&pf);

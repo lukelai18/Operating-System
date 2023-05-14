@@ -240,7 +240,7 @@ long _fill_pml4(pml4_t *pml4, uintptr_t paddr, uintptr_t vaddr, uintptr_t vmax,
 long pt_map(pml4_t *pml4, uintptr_t paddr, uintptr_t vaddr, uint32_t pdflags,
             uint32_t ptflags)
 {
-    dbg(DBG_VM,"Now we enter pt_map");
+    dbg(DBG_VM,"Now we enter pt_map\n");
     return pt_map_range(pml4, paddr, vaddr, vaddr + PAGE_SIZE, pdflags,
                         ptflags);
 }
