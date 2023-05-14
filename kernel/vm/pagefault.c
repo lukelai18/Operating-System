@@ -83,10 +83,8 @@ void handle_pagefault(uintptr_t vaddr, uintptr_t cause)
     mobj_lock(fault_vmarea->vma_obj);
     long tmp=mobj_get_pframe(fault_vmarea->vma_obj,ADDR_TO_PN(vaddr)-fault_vmarea->vma_start+fault_vmarea->vma_off,
         cause&FAULT_WRITE,&pf);
+    mobj_unlock(fault_vmarea->vma_obj);
     if(tmp<0){
-        // pframe_release(&pf);
-        // kmutex_unlock(&pf->pf_mutex);
-        mobj_unlock(fault_vmarea->vma_obj);
         do_exit(EFAULT);
         panic("Cannot get pframe");
     }
@@ -101,16 +99,12 @@ void handle_pagefault(uintptr_t vaddr, uintptr_t cause)
     // Like, page 10-11 may be mapped to the page 0 inside the file
     long tmp2=pt_map(curproc->p_pml4,phy_addr,(uintptr_t)PAGE_ALIGN_DOWN(vaddr),pdflags,ptflags);
     if(tmp<0){
-        // pframe_release(&pf);
-        // kmutex_unlock(&pf->pf_mutex);
-        mobj_unlock(fault_vmarea->vma_obj);
+        pframe_release(&pf);
         do_exit(EFAULT);
     }
 
     // Flush the tlb
-    tlb_flush_all();
+    tlb_flush(vaddr);
     pframe_release(&pf);
-    // kmutex_unlock(&pf->pf_mutex);
-    mobj_unlock(fault_vmarea->vma_obj);
     // NOT_YET_IMPLEMENTED("VM: handle_pagefault");
 }

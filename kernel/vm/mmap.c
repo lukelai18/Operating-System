@@ -138,8 +138,7 @@ long do_munmap(void *addr, size_t len)
     if((size_t)addr<USER_MEM_LOW||(size_t)addr+len>USER_MEM_HIGH){
         return -EINVAL;
     }
-
-    long tmp=vmmap_remove(curproc->p_vmmap,ADDR_TO_PN(addr),(size_t)PAGE_ALIGN_UP(len)/PAGE_SIZE);
+    long tmp=vmmap_remove(curproc->p_vmmap,ADDR_TO_PN(addr),ADDR_TO_PN(PAGE_ALIGN_UP(len)));
 
     // NOT_YET_IMPLEMENTED("VM: do_munmap");
     return tmp;
