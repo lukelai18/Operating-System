@@ -486,7 +486,7 @@ long vmmap_remove(vmmap_t *map, size_t lopage, size_t npages)
 
             vmmap_insert(map,new_vmarea);  // Insert it into the map list 
         } else if(cur_vmarea->vma_end>lopage&&cur_vmarea->vma_end<=end_page&&cur_vmarea->vma_start<lopage){  // Case 2
-            uintptr_t vmax=(uintptr_t)PN_TO_ADDR(cur_vmarea->vma_end-lopage);
+            uintptr_t vmax=(uintptr_t)PN_TO_ADDR(cur_vmarea->vma_end);
             size_t range=cur_vmarea->vma_end-lopage;
             cur_vmarea->vma_end=lopage; // Cut the size of vmarea
 
@@ -495,7 +495,7 @@ long vmmap_remove(vmmap_t *map, size_t lopage, size_t npages)
             }
             tlb_flush_range((uintptr_t)PN_TO_ADDR(lopage),range);
         } else if(cur_vmarea->vma_end>end_page&&cur_vmarea->vma_start>=lopage&&cur_vmarea->vma_start<end_page) { // Case 3
-            uintptr_t vmax=(uintptr_t)PN_TO_ADDR(lopage+npages-cur_vmarea->vma_start);
+            uintptr_t vmax=(uintptr_t)PN_TO_ADDR(lopage+npages);
             size_t range=lopage+npages-cur_vmarea->vma_start;
 
             cur_vmarea->vma_start=end_page;
@@ -506,7 +506,7 @@ long vmmap_remove(vmmap_t *map, size_t lopage, size_t npages)
             }
             tlb_flush_range((uintptr_t)PN_TO_ADDR(lopage),range);
         } else if(cur_vmarea->vma_start>lopage&&cur_vmarea->vma_end<end_page){    // Case 4
-            uintptr_t vmax=(uintptr_t)PN_TO_ADDR(cur_vmarea->vma_end-cur_vmarea->vma_start);
+            uintptr_t vmax=(uintptr_t)PN_TO_ADDR(cur_vmarea->vma_end);
             size_t range=cur_vmarea->vma_end-cur_vmarea->vma_start;
 
             if(map->vmm_proc){
