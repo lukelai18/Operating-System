@@ -103,28 +103,28 @@ mobj_t *shadow_create(mobj_t *shadowed)
 void shadow_collapse(mobj_t *o)
 {
     // o Should be locked on entry and return
-    mobj_t *cur_o=o;
-    mobj_shadow_t *sha_o=MOBJ_TO_SO(cur_o);     // Get the shadow object
-    while(sha_o->shadowed->mo_type==MOBJ_SHADOW){ 
+    mobj_t *par_o=o;    // Parent mobj
+    mobj_t *cur_o=MOBJ_TO_SO(o)->shadowed;  // Set the cur_o to the second mobj in the chain
+    // mobj_shadow_t *sha_o=MOBJ_TO_SO(cur_o);     // Get the shadow object
+    while(cur_o->mo_type==MOBJ_SHADOW){ 
         // If its shadow object only has 1 refcount
         // Previous one call find pframe
-       if(sha_o->shadowed->mo_refcount==1){
+       if(cur_o->mo_refcount==1){
             // mobj_lock(sha_o->shadowed);
-            list_iterate(&sha_o->shadowed->mo_pframes,cur_pf,pframe_t,pf_link){
+            list_iterate(&cur_o->mo_pframes,cur_pf,pframe_t,pf_link){
                 // Check if this pframe exist in parent shadow object
                 pframe_t *pf;
-                if(cur_o!=o){
-                    mobj_lock(cur_o);
+                if(par_o!=o){
+                    mobj_lock(par_o);
                 }
-                mobj_find_pframe(cur_o,cur_pf->pf_pagenum,&pf); 
-                if(cur_o!=o){
-                    mobj_unlock(cur_o);
+                mobj_find_pframe(par_o,cur_pf->pf_pagenum,&pf); 
+                if(par_o!=o){
+                    mobj_unlock(par_o);
                 }  
                 // If the pframe is NULL
                 if(pf==NULL){   // If we cannot find it in parent shadow object, we should migrate it 
                     list_remove(&cur_pf->pf_link);  // Remove current pframe from its list on shadowed object
-                    list_insert_tail(&cur_o->mo_pframes,&cur_pf->pf_link);  // Insert it into current mobj
-                    // pframe_release(&cur_pf);    // Unlock it
+                    list_insert_tail(&par_o->mo_pframes,&cur_pf->pf_link);  // Insert it into current mobj
                 }
                 else{   // If the pframe is not NULL, which means that it exist on parent shadow object
                     pframe_release(&pf);        //  Unlock the pframe
@@ -132,18 +132,17 @@ void shadow_collapse(mobj_t *o)
                 }
             }
 
-            mobj_t *removed_mobj=sha_o->shadowed;   // Store the shadowed object need to be removed
-            sha_o->shadowed=MOBJ_TO_SO(sha_o->shadowed)->shadowed;  // Update its shadowed object
-            mobj_ref(sha_o->shadowed);  // Increase the reference of its new shadow object
-            mobj_put(&removed_mobj);
+            // mobj_t *removed_mobj=cur_o;   // Store the shadowed object need to be removed
+            MOBJ_TO_SO(par_o)->shadowed=MOBJ_TO_SO(cur_o)->shadowed;  // Update parent's shadowed object
+            mobj_ref(MOBJ_TO_SO(cur_o)->shadowed);  // Increase the reference of its new shadow object
+            mobj_put(&cur_o);
 
         } else{
-            // If we cannot remove it, update current mobj and sha_o
-            cur_o=sha_o->shadowed; 
-            sha_o=MOBJ_TO_SO(cur_o);
+            // If we cannot remove it, update par_o and cur_o to the next one
+            par_o=cur_o;
+            cur_o=MOBJ_TO_SO(cur_o)->shadowed;
             // TODO: Double check it
         }
-        // Update mobj and shadow object
     }
     // NOT_YET_IMPLEMENTED("VM: shadow_collapse");
 }
