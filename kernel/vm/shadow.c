@@ -135,6 +135,7 @@ void shadow_collapse(mobj_t *o)
             MOBJ_TO_SO(par_o)->shadowed=MOBJ_TO_SO(cur_o)->shadowed;  // Update parent's shadowed object
             mobj_ref(MOBJ_TO_SO(cur_o)->shadowed);  // Increase the reference of its new shadow object
             mobj_put(&cur_o);
+            cur_o=MOBJ_TO_SO(par_o)->shadowed;
         } else{
             // If we cannot remove it, update par_o and cur_o to the next one
             par_o=cur_o;
