@@ -71,6 +71,7 @@ mobj_t *shadow_create(mobj_t *shadowed)
     
     // Initialize the shadowed and buttom mobj in mobj_shadow_t
     new_sha->shadowed=shadowed;
+    mobj_ref(shadowed);
     if(shadowed->mo_type==MOBJ_SHADOW){ // If the shadowed is a shadow object
         new_sha->bottom_mobj=MOBJ_TO_SO(shadowed)->bottom_mobj;
         mobj_ref(MOBJ_TO_SO(shadowed)->bottom_mobj);

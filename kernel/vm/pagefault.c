@@ -104,7 +104,7 @@ void handle_pagefault(uintptr_t vaddr, uintptr_t cause)
     }
 
     // Flush the tlb
-    tlb_flush(vaddr);
+    tlb_flush((uintptr_t)PAGE_ALIGN_DOWN(vaddr));
     pframe_release(&pf);
     // NOT_YET_IMPLEMENTED("VM: handle_pagefault");
 }
