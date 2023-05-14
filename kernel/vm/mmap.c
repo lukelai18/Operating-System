@@ -83,7 +83,8 @@ long do_mmap(void *addr, size_t len, int prot, int flags, int fd, off_t off,
         return -EINVAL;
     }
     // Avoid len too long or addr is greater than USER_MEM_HIGH
-    if((flags&MAP_FIXED)&&((len>USER_MEM_HIGH-(size_t)addr)||(size_t)addr>USER_MEM_HIGH)){
+    if((flags&MAP_FIXED)&&((size_t)addr<USER_MEM_LOW||(size_t)addr>USER_MEM_HIGH||
+        (size_t)addr+len>USER_MEM_HIGH||(size_t)addr+len<USER_MEM_LOW||len>USER_MEM_HIGH)){
         return -EINVAL;
     }
     // Mmap operation doesn't exist
@@ -112,7 +113,7 @@ long do_mmap(void *addr, size_t len, int prot, int flags, int fd, off_t off,
         return tmp;
     }
 
-    tlb_flush_range((uintptr_t)PN_TO_ADDR(new_vma->vma_start),
+    tlb_flush_range((uintptr_t)PN_TO_ADDR(PAGE_ALIGN_DOWN(new_vma->vma_start)),
         npages);
     *ret=PN_TO_ADDR(new_vma->vma_start);
 
@@ -149,7 +150,9 @@ long do_munmap(void *addr, size_t len)
         ||(size_t)addr+len<USER_MEM_LOW||len>USER_MEM_HIGH){
         return -EINVAL;
     }
-    long tmp=vmmap_remove(curproc->p_vmmap,ADDR_TO_PN(addr),ADDR_TO_PN(PAGE_ALIGN_UP(len)));
+    size_t lopage=ADDR_TO_PN(addr);
+    size_t npages=ADDR_TO_PN(PAGE_ALIGN_UP((size_t)addr+len))-lopage;
+    long tmp=vmmap_remove(curproc->p_vmmap,lopage,npages);
 
     // NOT_YET_IMPLEMENTED("VM: do_munmap");
     return tmp;
