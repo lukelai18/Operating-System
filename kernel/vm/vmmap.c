@@ -352,7 +352,6 @@ long vmmap_map(vmmap_t *map, vnode_t *file, size_t lopage, size_t npages,
     // Get the new memory object here
     if(file==NULL){ // If file is NULL
         new_mobj=anon_create();     // Create new memory object
-        // TODO: It was locked, unlock it somewhere
         if(new_mobj==NULL){
             return -ENOMEM;
         }
@@ -471,7 +470,7 @@ long vmmap_remove(vmmap_t *map, size_t lopage, size_t npages)
             // Update the start, end and off, and initalize it
             new_vmarea->vma_start=end_page;
             new_vmarea->vma_end=cur_vmarea->vma_end;
-            new_vmarea->vma_off=cur_vmarea->vma_off+end_page-cur_vmarea->vma_start;
+            new_vmarea->vma_off=cur_vmarea->vma_off+new_vmarea->vma_start-cur_vmarea->vma_start;
             new_vmarea->vma_flags=cur_vmarea->vma_flags;
             new_vmarea->vma_prot=cur_vmarea->vma_prot;
             new_vmarea->vma_obj=cur_vmarea->vma_obj;
