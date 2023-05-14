@@ -88,7 +88,7 @@ long do_mmap(void *addr, size_t len, int prot, int flags, int fd, off_t off,
             return -EACCES;
         }
     }
-    if(!PAGE_ALIGNED(addr)&&flags&MAP_FIXED){
+    if((!PAGE_ALIGNED(addr)||addr==0)&&flags&MAP_FIXED){
         if(file!=NULL){
             fput(&file);
         }
@@ -113,8 +113,8 @@ long do_mmap(void *addr, size_t len, int prot, int flags, int fd, off_t off,
         return -EINVAL;
     }
     // Avoid len too long or addr is greater than USER_MEM_HIGH
-    if((flags&MAP_FIXED)&&((size_t)addr<USER_MEM_LOW||(size_t)addr>USER_MEM_HIGH||
-        (size_t)addr+len>USER_MEM_HIGH||(size_t)addr+len<USER_MEM_LOW||len>USER_MEM_HIGH)){
+    if((flags&MAP_FIXED)&&((size_t)addr<USER_MEM_LOW||(size_t)addr>=USER_MEM_HIGH||
+        (size_t)addr+len>=USER_MEM_HIGH||(size_t)addr+len<USER_MEM_LOW||len>=USER_MEM_HIGH)){
         if(file!=NULL){
             fput(&file);
         }    
@@ -173,8 +173,8 @@ long do_munmap(void *addr, size_t len)
     if(!PAGE_ALIGNED(addr)){
         return -EINVAL;
     }
-    if((size_t)addr<USER_MEM_LOW||(size_t)addr>USER_MEM_HIGH||(size_t)addr+len>USER_MEM_HIGH
-        ||(size_t)addr+len<USER_MEM_LOW||len>USER_MEM_HIGH){
+    if((size_t)addr<USER_MEM_LOW||(size_t)addr>=USER_MEM_HIGH||(size_t)addr+len>=USER_MEM_HIGH
+        ||(size_t)addr+len<USER_MEM_LOW||len>=USER_MEM_HIGH){
         return -EINVAL;
     }
     size_t lopage=ADDR_TO_PN(addr);
