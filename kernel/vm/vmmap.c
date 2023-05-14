@@ -289,7 +289,7 @@ vmmap_t *vmmap_clone(vmmap_t *map)
              mobj_t* sha_map=shadow_create(cur_vmarea->vma_obj);
              mobj_t* sha_newmap=shadow_create(new_vmarea->vma_obj);
              mobj_put(&cur_vmarea->vma_obj);
-             mobj_put(&new_vmarea->vma_obj);
+             // mobj_put(&new_vmarea->vma_obj);
              // Insert into vmarea 
              cur_vmarea->vma_obj=sha_map;
              mobj_unlock(sha_map);
