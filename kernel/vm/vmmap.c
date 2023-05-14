@@ -41,16 +41,6 @@ vmarea_t *vmarea_alloc(void)
     // Initialize it, need to come back
     memset(new_vmarea, 0, sizeof(vmarea_t));
 
-    // new_vmarea->vma_start=0;
-    // new_vmarea->vma_off=0;
-    // new_vmarea->vma_end=0;
-
-    // new_vmarea->vma_flags=0;
-    // new_vmarea->vma_prot=0;
-
-    // new_vmarea->vma_vmmap=NULL;
-    // new_vmarea->vma_obj=NULL;
-    // list_link_init(&new_vmarea->vma_plink);
     //NOT_YET_IMPLEMENTED("VM: vmarea_alloc");
     
     return new_vmarea;
@@ -405,7 +395,7 @@ long vmmap_map(vmmap_t *map, vnode_t *file, size_t lopage, size_t npages,
     new->vma_prot=prot;
     new->vma_vmmap=map;
     new->vma_obj=new_mobj;
-    mobj_ref(new_mobj);
+    // mobj_ref(new_mobj);
 
     new->vma_off=ADDR_TO_PN(off);
     
