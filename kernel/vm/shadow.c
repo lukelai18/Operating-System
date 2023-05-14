@@ -41,8 +41,8 @@ static mobj_ops_t shadow_mobj_ops = {.get_pframe = shadow_get_pframe,
  */
 void shadow_init()
 {
-    // shadow_allocator=slab_allocator_create("shadow",sizeof(mobj_shadow_t));
-    // KASSERT(shadow_allocator);
+    shadow_allocator=slab_allocator_create("shadow",sizeof(mobj_shadow_t));
+    KASSERT(shadow_allocator);
     //NOT_YET_IMPLEMENTED("VM: shadow_init");
 }
 
@@ -62,27 +62,27 @@ void shadow_init()
  */
 mobj_t *shadow_create(mobj_t *shadowed)
 {
-    // mobj_shadow_t *new_sha=slab_obj_alloc(shadow_allocator);
-    // if(new_sha==NULL){
-    //     return NULL;
-    // }
+    mobj_shadow_t *new_sha=slab_obj_alloc(shadow_allocator);
+    if(new_sha==NULL){
+        return NULL;
+    }
 
-    // mobj_init(&new_sha->mobj,MOBJ_SHADOW,&shadow_mobj_ops);     // Initialize mobj field
+    mobj_init(&new_sha->mobj,MOBJ_SHADOW,&shadow_mobj_ops);     // Initialize mobj field
     
-    // // Initialize the shadowed and buttom mobj in mobj_shadow_t
-    // new_sha->shadowed=shadowed;
-    // if(shadowed->mo_type==MOBJ_SHADOW){ // If the shadowed is a shadow object
-    //     new_sha->bottom_mobj=MOBJ_TO_SO(shadowed)->bottom_mobj;
-    //     mobj_ref(MOBJ_TO_SO(shadowed)->bottom_mobj);
-    // }else{              // If the shadowed is not a shadowed object
-    //     new_sha->bottom_mobj=shadowed;
-    //     mobj_ref(shadowed);
-    // }
-    // // new_sha->mobj.mo_refcount+=2;   // Have the refcount to bottom_mobj and shadowed
-    // mobj_lock(&new_sha->mobj);
-    // // NOT_YET_IMPLEMENTED("VM: shadow_create");
-    // return &new_sha->mobj;
-    return NULL;
+    // Initialize the shadowed and buttom mobj in mobj_shadow_t
+    new_sha->shadowed=shadowed;
+    if(shadowed->mo_type==MOBJ_SHADOW){ // If the shadowed is a shadow object
+        new_sha->bottom_mobj=MOBJ_TO_SO(shadowed)->bottom_mobj;
+        mobj_ref(MOBJ_TO_SO(shadowed)->bottom_mobj);
+    }else{              // If the shadowed is not a shadowed object
+        new_sha->bottom_mobj=shadowed;
+        mobj_ref(shadowed);
+    }
+    // new_sha->mobj.mo_refcount+=2;   // Have the refcount to bottom_mobj and shadowed
+    mobj_lock(&new_sha->mobj);
+    // NOT_YET_IMPLEMENTED("VM: shadow_create");
+    return &new_sha->mobj;
+    // return NULL;
 }
 
 /*
@@ -101,45 +101,45 @@ mobj_t *shadow_create(mobj_t *shadowed)
  */
 void shadow_collapse(mobj_t *o)
 {
-    // // o Should be locked on entry and return
-    // mobj_t *cur_o=o;
-    // mobj_shadow_t *sha_o=MOBJ_TO_SO(cur_o);     // Get the shadow object
-    // while(sha_o->shadowed->mo_type==MOBJ_SHADOW){ 
-    //     // If its shadow object only has 1 refcount
-    //     // Previous one call find pframe
-    //    if(sha_o->shadowed->mo_refcount==1){
-    //         // mobj_lock(sha_o->shadowed);
-    //         list_iterate(&sha_o->shadowed->mo_pframes,cur_pf,pframe_t,pf_link){
-    //             // Check if this pframe exist in parent shadow object
-    //             pframe_t *pf;
-    //             mobj_lock(cur_o);
-    //             mobj_find_pframe(cur_o,cur_pf->pf_pagenum,&pf); 
-    //             mobj_unlock(cur_o);  
-    //             // If the pframe is NULL
-    //             if(pf==NULL){   // If we cannot find it in parent shadow object, we should migrate it 
-    //                 list_remove(&cur_pf->pf_link);  // Remove current pframe from its list on shadowed object
-    //                 list_insert_tail(&cur_o->mo_pframes,&cur_pf->pf_link);  // Insert it into current mobj
-    //                 // pframe_release(&cur_pf);    // Unlock it
-    //             }
-    //             else{   // If the pframe is not NULL, which means that it exist on parent shadow object
-    //                 pframe_release(&pf);        //  Unlock the pframe
-    //                 // mobj_free_pframe(sha_o->shadowed,&cur_pf);    
-    //             }
-    //         }
+    // o Should be locked on entry and return
+    mobj_t *cur_o=o;
+    mobj_shadow_t *sha_o=MOBJ_TO_SO(cur_o);     // Get the shadow object
+    while(sha_o->shadowed->mo_type==MOBJ_SHADOW){ 
+        // If its shadow object only has 1 refcount
+        // Previous one call find pframe
+       if(sha_o->shadowed->mo_refcount==1){
+            // mobj_lock(sha_o->shadowed);
+            list_iterate(&sha_o->shadowed->mo_pframes,cur_pf,pframe_t,pf_link){
+                // Check if this pframe exist in parent shadow object
+                pframe_t *pf;
+                mobj_lock(cur_o);
+                mobj_find_pframe(cur_o,cur_pf->pf_pagenum,&pf); 
+                mobj_unlock(cur_o);  
+                // If the pframe is NULL
+                if(pf==NULL){   // If we cannot find it in parent shadow object, we should migrate it 
+                    list_remove(&cur_pf->pf_link);  // Remove current pframe from its list on shadowed object
+                    list_insert_tail(&cur_o->mo_pframes,&cur_pf->pf_link);  // Insert it into current mobj
+                    // pframe_release(&cur_pf);    // Unlock it
+                }
+                else{   // If the pframe is not NULL, which means that it exist on parent shadow object
+                    pframe_release(&pf);        //  Unlock the pframe
+                    // mobj_free_pframe(sha_o->shadowed,&cur_pf);    
+                }
+            }
 
-    //         mobj_t *removed_mobj=sha_o->shadowed;   // Store the shadowed object need to be removed
-    //         sha_o->shadowed=MOBJ_TO_SO(sha_o->shadowed)->shadowed;  // Update its shadowed object
-    //         mobj_ref(sha_o->shadowed);  // Increase the reference of its new shadow object
-    //         mobj_put(&removed_mobj);
+            mobj_t *removed_mobj=sha_o->shadowed;   // Store the shadowed object need to be removed
+            sha_o->shadowed=MOBJ_TO_SO(sha_o->shadowed)->shadowed;  // Update its shadowed object
+            mobj_ref(sha_o->shadowed);  // Increase the reference of its new shadow object
+            mobj_put(&removed_mobj);
 
-    //     } else{
-    //         // If we cannot remove it, update current mobj and sha_o
-    //         cur_o=sha_o->shadowed; 
-    //         sha_o=MOBJ_TO_SO(cur_o);
-    //         // TODO: Double check it
-    //     }
-    //     // Update mobj and shadow object
-    // }
+        } else{
+            // If we cannot remove it, update current mobj and sha_o
+            cur_o=sha_o->shadowed; 
+            sha_o=MOBJ_TO_SO(cur_o);
+            // TODO: Double check it
+        }
+        // Update mobj and shadow object
+    }
     // NOT_YET_IMPLEMENTED("VM: shadow_collapse");
 }
 
@@ -171,56 +171,56 @@ void shadow_collapse(mobj_t *o)
 static long shadow_get_pframe(mobj_t *o, size_t pagenum, long forwrite,
                               pframe_t **pfp)
 {
-    // // This function returned with pfp locked when succeed
-    // // o is locked when enter this function and should be locked when return
-    // // Set another cur to loop it
-    // // If forwrite is set
-    // if(forwrite){
-    //     pframe_t *cur_pf;
-    //     long tmp=mobj_default_get_pframe(o,pagenum,forwrite,&cur_pf);  // Return with cur_pf locked
-    //     *pfp=cur_pf;
-    //     return tmp; // If tmp<0, pfp will be unlocked
-    // } else{     
-    //     // If forwrite is clear
-    //     // Check if o already contains the desired frame
-    //     pframe_t *cur_pf;   // Using this variable when searching
+    // This function returned with pfp locked when succeed
+    // o is locked when enter this function and should be locked when return
+    // Set another cur to loop it
+    // If forwrite is set
+    if(forwrite){
+        pframe_t *cur_pf;
+        long tmp=mobj_default_get_pframe(o,pagenum,forwrite,&cur_pf);  // Return with cur_pf locked
+        *pfp=cur_pf;
+        return tmp; // If tmp<0, pfp will be unlocked
+    } else{     
+        // If forwrite is clear
+        // Check if o already contains the desired frame
+        pframe_t *cur_pf;   // Using this variable when searching
 
-    //     mobj_find_pframe(o,pagenum,&cur_pf);
-    //     if(cur_pf!=NULL){
-    //         // Return with the pf mutex locked
-    //         *pfp=cur_pf;
-    //         return 0;
-    //     }
+        mobj_find_pframe(o,pagenum,&cur_pf);
+        if(cur_pf!=NULL){
+            // Return with the pf mutex locked
+            *pfp=cur_pf;
+            return 0;
+        }
         
-    //     // If not in o, iterate its shadow object chain, checked if the pf exist in this chain
-    //     mobj_t *cur_o=MOBJ_TO_SO(o)->shadowed;
-    //     while(cur_o->mo_type==MOBJ_SHADOW){
-    //         mobj_lock(cur_o);
+        // If not in o, iterate its shadow object chain, checked if the pf exist in this chain
+        mobj_t *cur_o=MOBJ_TO_SO(o)->shadowed;
+        while(cur_o->mo_type==MOBJ_SHADOW){
+            mobj_lock(cur_o);
 
-    //         // Check each shadowed object's page frame
-    //         mobj_find_pframe(cur_o,pagenum,&cur_pf);
-    //         if(cur_pf!=NULL){
-    //             mobj_unlock(cur_o);
-    //             *pfp=cur_pf;
-    //             return 0;
-    //         }
+            // Check each shadowed object's page frame
+            mobj_find_pframe(cur_o,pagenum,&cur_pf);
+            if(cur_pf!=NULL){
+                mobj_unlock(cur_o);
+                *pfp=cur_pf;
+                return 0;
+            }
 
-    //         mobj_unlock(cur_o); // Unlock o before updating it
-    //         cur_o=MOBJ_TO_SO(cur_o)->shadowed;
-    //     }
+            mobj_unlock(cur_o); // Unlock o before updating it
+            cur_o=MOBJ_TO_SO(cur_o)->shadowed;
+        }
    
-    //     // If we still cannot find, and now cur_o has become the buttom object
-    //     mobj_lock(cur_o);
-    //     long tmp=mobj_get_pframe(cur_o,pagenum,forwrite,&cur_pf);   // This one will lock pfp on return when find it
-    //     mobj_unlock(cur_o);
-    //     if(tmp<0){         
-    //         // kmutex_unlock(&cur_pf->pf_mutex);   
-    //         return tmp;
-    //     }
-    //     *pfp=cur_pf;
-    // }
+        // If we still cannot find, and now cur_o has become the buttom object
+        mobj_lock(cur_o);
+        long tmp=mobj_get_pframe(cur_o,pagenum,forwrite,&cur_pf);   // This one will lock pfp on return when find it
+        mobj_unlock(cur_o);
+        if(tmp<0){         
+            // kmutex_unlock(&cur_pf->pf_mutex);   
+            return tmp;
+        }
+        *pfp=cur_pf;
+    }
     // NOT_YET_IMPLEMENTED("VM: shadow_get_pframe");
-     return 0;
+    return 0;
 }
 
 /*
@@ -246,36 +246,36 @@ static long shadow_get_pframe(mobj_t *o, size_t pagenum, long forwrite,
  */
 static long shadow_fill_pframe(mobj_t *o, pframe_t *pf)
 {
-    // // KASSERT(o->mo_type==MOBJ_SHADOW&&"Make sure it is shadow object");
-    // mobj_t *cur_o=MOBJ_TO_SO(o)->shadowed;  // The first mobj we need to iterate
-    // size_t request_pagenum=pf->pf_pagenum;  // Requested page number
-    // pframe_t *cur_pf;       // The finded pframe
-    // while(cur_o->mo_type==MOBJ_SHADOW){
-    //     mobj_lock(cur_o);   // Lock current mobj
-    //     mobj_find_pframe(cur_o,request_pagenum,&cur_pf);
-    //     // If we found the page frame
-    //     if(cur_pf!=NULL){
-    //         memcpy(pf->pf_addr,cur_pf->pf_addr,PAGE_SIZE);  // Copy its content into pf
-    //         pframe_release(&cur_pf);
-    //         // kmutex_unlock(&cur_pf->pf_mutex);
-    //         mobj_unlock(cur_o);
-    //         return 0;
-    //     }
-    //     mobj_unlock(cur_o);
+    // KASSERT(o->mo_type==MOBJ_SHADOW&&"Make sure it is shadow object");
+    mobj_t *cur_o=MOBJ_TO_SO(o)->shadowed;  // The first mobj we need to iterate
+    size_t request_pagenum=pf->pf_pagenum;  // Requested page number
+    pframe_t *cur_pf;       // The finded pframe
+    while(cur_o->mo_type==MOBJ_SHADOW){
+        mobj_lock(cur_o);   // Lock current mobj
+        mobj_find_pframe(cur_o,request_pagenum,&cur_pf);
+        // If we found the page frame
+        if(cur_pf!=NULL){
+            memcpy(pf->pf_addr,cur_pf->pf_addr,PAGE_SIZE);  // Copy its content into pf
+            pframe_release(&cur_pf);
+            // kmutex_unlock(&cur_pf->pf_mutex);
+            mobj_unlock(cur_o);
+            return 0;
+        }
+        mobj_unlock(cur_o);
 
-    //     cur_o=MOBJ_TO_SO(cur_o)->shadowed;  // Update current mobj
-    // }
-    // // If none of the shadow object have a copy of the pframe, get it on the bottom object
-    // mobj_lock(cur_o);
-    // long tmp=mobj_get_pframe(cur_o,request_pagenum,0,&cur_pf);
-    // mobj_unlock(cur_o);
-    // if(tmp<0){
-    //     return tmp;
-    // }
-    // // If get it, copy it to pf
-    // memcpy(pf->pf_addr,cur_pf->pf_addr,PAGE_SIZE);
-    // pframe_release(&cur_pf);
-    // // NOT_YET_IMPLEMENTED("VM: shadow_fill_pframe");
+        cur_o=MOBJ_TO_SO(cur_o)->shadowed;  // Update current mobj
+    }
+    // If none of the shadow object have a copy of the pframe, get it on the bottom object
+    mobj_lock(cur_o);
+    long tmp=mobj_get_pframe(cur_o,request_pagenum,0,&cur_pf);
+    mobj_unlock(cur_o);
+    if(tmp<0){
+        return tmp;
+    }
+    // If get it, copy it to pf
+    memcpy(pf->pf_addr,cur_pf->pf_addr,PAGE_SIZE);
+    pframe_release(&cur_pf);
+    // NOT_YET_IMPLEMENTED("VM: shadow_fill_pframe");
     return 0;
 }
 
@@ -306,9 +306,9 @@ static long shadow_flush_pframe(mobj_t *o, pframe_t *pf)
  */
 static void shadow_destructor(mobj_t *o)
 {
-    // mobj_default_destructor(o);
-    // mobj_put(&MOBJ_TO_SO(o)->shadowed);
-    // mobj_put(&MOBJ_TO_SO(o)->bottom_mobj);
-    // slab_obj_free(shadow_allocator,o);
+    mobj_default_destructor(o);
+    mobj_put(&MOBJ_TO_SO(o)->shadowed);
+    mobj_put(&MOBJ_TO_SO(o)->bottom_mobj);
+    slab_obj_free(shadow_allocator,o);
     // NOT_YET_IMPLEMENTED("VM: shadow_destructor");
 }

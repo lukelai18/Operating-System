@@ -138,11 +138,8 @@ void vmmap_insert(vmmap_t *map, vmarea_t *new_vma)
     }
 
     // If we cannot find an appropriate place, we may insert it in the tail
-    // end_pn=ADDR_TO_PN(USER_MEM_HIGH);
-    // if(new_vma->vma_start>=start_pn&&new_vma->vma_end<=end_pn){
     list_insert_tail(&map->vmm_list,&new_vma->vma_plink);
     new_vma->vma_vmmap=map;
-    // }
     // NOT_YET_IMPLEMENTED("VM: vmmap_insert");
 }
 
@@ -377,22 +374,22 @@ long vmmap_map(vmmap_t *map, vnode_t *file, size_t lopage, size_t npages,
         }
     }
 
-    // if(flags&MAP_PRIVATE){
-    //     mobj_t *sha_obj=shadow_create(new_mobj);    // Will be locked here
+    if(flags&MAP_PRIVATE){
+        mobj_t *sha_obj=shadow_create(new_mobj);    // Will be locked here
         
-    //     if(sha_obj==NULL){          
-    //         return -ENOMEM;
-    //     }
+        if(sha_obj==NULL){          
+            return -ENOMEM;
+        }
 
-    //     mobj_t *old_mobj=new_mobj;  // Store the previous mobj and unlock it
+        mobj_t *old_mobj=new_mobj;  // Store the previous mobj and unlock it
 
-    //     new_mobj=sha_obj;   // It has been locked in shadow_create
-    //     // mobj_ref(sha_obj);  // Ref the shadow obj
+        new_mobj=sha_obj;   // It has been locked in shadow_create
+        // mobj_ref(sha_obj);  // Ref the shadow obj
 
-    //     mobj_put(&old_mobj);  // Put the previous mobj
+        mobj_put(&old_mobj);  // Put the previous mobj
 
-    //     mobj_unlock(sha_obj);   // Unlock the created shadow object
-    // }
+        mobj_unlock(sha_obj);   // Unlock the created shadow object
+    }
 
     // Initialize the new vmarea_t
     vmarea_t *new=vmarea_alloc();
