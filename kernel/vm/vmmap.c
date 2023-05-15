@@ -488,22 +488,23 @@ long vmmap_remove(vmmap_t *map, size_t lopage, size_t npages)
             uintptr_t vmax=(uintptr_t)PN_TO_ADDR(lopage+npages);
             size_t range=lopage+npages-cur_vmarea->vma_start;
 
-            cur_vmarea->vma_start=end_page;
+            size_t old_start=cur_vmarea->vma_start;
             cur_vmarea->vma_off=cur_vmarea->vma_off+end_page-cur_vmarea->vma_start;
+            cur_vmarea->vma_start=end_page;
 
             if(map->vmm_proc){
-                pt_unmap_range(map->vmm_proc->p_pml4,(uintptr_t)PN_TO_ADDR(lopage),vmax);
+                pt_unmap_range(map->vmm_proc->p_pml4,(uintptr_t)PN_TO_ADDR(old_start),vmax);
             }
-            tlb_flush_range((uintptr_t)PN_TO_ADDR(lopage),range);
+            tlb_flush_range((uintptr_t)PN_TO_ADDR(old_start),range);
         } else if(cur_vmarea->vma_start>lopage&&cur_vmarea->vma_end<end_page){    // Case 4
             uintptr_t vmax=(uintptr_t)PN_TO_ADDR(cur_vmarea->vma_end);
             size_t range=cur_vmarea->vma_end-cur_vmarea->vma_start;
 
             if(map->vmm_proc){
-                pt_unmap_range(map->vmm_proc->p_pml4,(uintptr_t)PN_TO_ADDR(lopage),vmax);
+                pt_unmap_range(map->vmm_proc->p_pml4,(uintptr_t)PN_TO_ADDR(cur_vmarea->vma_start),vmax);
             }
             vmarea_free(cur_vmarea);
-            tlb_flush_range((uintptr_t)PN_TO_ADDR(lopage),range);
+            tlb_flush_range((uintptr_t)PN_TO_ADDR(cur_vmarea->vma_start),range);
         }
     }
 

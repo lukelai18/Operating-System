@@ -62,8 +62,10 @@ long do_mmap(void *addr, size_t len, int prot, int flags, int fd, off_t off,
 {
     file_t *file=NULL;
     // fd is invalid and flags didn't map MAP_ANON
-    if(!(flags&MAP_ANON)&&(fd<0||fd>=NFILES)){
-        return -EBADF;
+    if((fd<0||fd>=NFILES)){
+        if(!(flags&MAP_ANON)){
+            return -EBADF;
+        }
     }else{
         file=fget(fd);
         if(file==NULL){
@@ -127,7 +129,11 @@ long do_mmap(void *addr, size_t len, int prot, int flags, int fd, off_t off,
     size_t lopage=ADDR_TO_PN(addr);
     size_t npages=ADDR_TO_PN(PAGE_ALIGN_UP((size_t)addr+len))-lopage;
 
-    long tmp=vmmap_map(curproc->p_vmmap,file->f_vnode,lopage,npages,
+    vnode_t *vn=NULL;
+    if(file!=NULL){
+        vn=file->f_vnode;
+    }
+    long tmp=vmmap_map(curproc->p_vmmap,vn,lopage,npages,
         prot,flags,off,VMMAP_DIR_HILO,&new_vma);
     if(tmp<0){
         if(file!=NULL){
@@ -177,7 +183,7 @@ long do_munmap(void *addr, size_t len)
         ||(size_t)addr+len<USER_MEM_LOW||len>=USER_MEM_HIGH){
         return -EINVAL;
     }
-    size_t lopage=ADDR_TO_PN(addr);
+    size_t lopage=ADDR_TO_PN(PAGE_ALIGN_DOWN(addr));
     size_t npages=ADDR_TO_PN(PAGE_ALIGN_UP((size_t)addr+len))-lopage;
     long tmp=vmmap_remove(curproc->p_vmmap,lopage,npages);
 
