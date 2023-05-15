@@ -474,7 +474,7 @@ pid_t do_waitpid(pid_t pid, int *status, int options)
  */
 void do_exit(long status)
 {
-    kthread_exit(&status); 
+    kthread_exit((void *)status); 
     // NOT_YET_IMPLEMENTED("PROCS: do_exit");
 }
 

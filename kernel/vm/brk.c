@@ -69,7 +69,7 @@ long do_brk(void *addr, void **ret)
         // We don't need to do anything here
         curproc->p_brk=addr;
     }else if(ADDR_TO_PN(PAGE_ALIGN_UP(curproc->p_brk))>ADDR_TO_PN(PAGE_ALIGN_UP(addr))){
-        size_t lopage=ADDR_TO_PN(PAGE_ALIGN_UP(curproc->p_brk));
+        size_t lopage=ADDR_TO_PN(PAGE_ALIGN_UP(addr));
         size_t npages=ADDR_TO_PN(PAGE_ALIGN_UP(curproc->p_brk))-ADDR_TO_PN(PAGE_ALIGN_UP(addr));
         vmmap_remove(curproc->p_vmmap,lopage,npages);    // Clean up the specified range
         curproc->p_brk=addr; // Update the new end of the heap
