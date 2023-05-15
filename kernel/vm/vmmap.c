@@ -524,7 +524,7 @@ long vmmap_is_range_empty(vmmap_t *map, size_t startvfn, size_t npages)
     vmarea_t *cur_vmarea;
     size_t endvfn=startvfn+npages; // Not inclusive
     list_iterate(&map->vmm_list,cur_vmarea,vmarea_t,vma_plink){
-        if((startvfn<=cur_vmarea->vma_start&&endvfn>=cur_vmarea->vma_end)||
+        if((startvfn<cur_vmarea->vma_start&&endvfn>cur_vmarea->vma_end)||
         (startvfn>=cur_vmarea->vma_start&&startvfn<cur_vmarea->vma_end)||
         (endvfn>cur_vmarea->vma_start&&endvfn<=cur_vmarea->vma_end)
         ){

@@ -88,7 +88,7 @@ long do_brk(void *addr, void **ret)
             }
         }else{
             // We just need to expand the vmarea
-            if(!vmmap_is_range_empty(curproc->p_vmmap,brk_pn,add_pn)){
+            if(!vmmap_is_range_empty(curproc->p_vmmap,brk_pn,add_pn-brk_pn)){
                 return -ENOMEM;     // Beyond its valid range
             }
             new_vm->vma_end=add_pn; // Expand it
