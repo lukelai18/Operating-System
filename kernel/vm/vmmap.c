@@ -452,7 +452,7 @@ long vmmap_remove(vmmap_t *map, size_t lopage, size_t npages)
     
     // TODO: Do need to clean TLB and pagetables when there are no mappings
     list_iterate(&map->vmm_list,cur_vmarea,vmarea_t,vma_plink){
-        if(cur_vmarea->vma_start<=lopage&&cur_vmarea->vma_end>=end_page){   // Case 1
+        if(cur_vmarea->vma_start<lopage&&cur_vmarea->vma_end>end_page){   // Case 1
             vmarea_t *new_vmarea=vmarea_alloc();
             if(new_vmarea==NULL){
                 return -ENOMEM;
@@ -496,7 +496,7 @@ long vmmap_remove(vmmap_t *map, size_t lopage, size_t npages)
                 pt_unmap_range(map->vmm_proc->p_pml4,(uintptr_t)PN_TO_ADDR(old_start),vmax);
             }
             tlb_flush_range((uintptr_t)PN_TO_ADDR(old_start),range);
-        } else if(cur_vmarea->vma_start>lopage&&cur_vmarea->vma_end<end_page){    // Case 4
+        } else if(cur_vmarea->vma_start>=lopage&&cur_vmarea->vma_end<=end_page){    // Case 4
             uintptr_t vmax=(uintptr_t)PN_TO_ADDR(cur_vmarea->vma_end);
             size_t range=cur_vmarea->vma_end-cur_vmarea->vma_start;
 
