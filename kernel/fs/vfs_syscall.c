@@ -385,18 +385,18 @@ long do_link(const char *oldpath, const char *newpath)
         vput(&res_vnode2);
         return -ENAMETOOLONG;
     }
-    if(!S_ISDIR(res_vnode->vn_mode))  { // If the res_vnode is not a directory
+    if(!S_ISDIR(res_vnode2->vn_mode))  { // If the res_vnode is not a directory
         vunlock_in_order(res_vnode,res_vnode2);
         vput(&res_vnode);
         vput(&res_vnode2);
         return -ENOTDIR;
     } 
-    res_vnode2->vn_ops->link(res_vnode2,*name,namelen,res_vnode); // Link the target vnode
+    long tmp3=res_vnode2->vn_ops->link(res_vnode2,*name,namelen,res_vnode); // Link the target vnode
     vunlock_in_order(res_vnode,res_vnode2);
     vput(&res_vnode);
     vput(&res_vnode2);
     // NOT_YET_IMPLEMENTED("VFS: do_link");
-    return 0;
+    return tmp3;
 }
 
 /* Rename a file or directory.

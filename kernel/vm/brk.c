@@ -56,68 +56,47 @@
  */
 long do_brk(void *addr, void **ret)
 {
-    // If addr is not in valid range 
-    if((size_t)addr>USER_MEM_HIGH||addr<curproc->p_start_brk){
-        return -ENOMEM;
-    }
-    // If addr is NULL
     if(addr==NULL){
         *ret=curproc->p_brk;
         return 0;
     }
-    
-    // We need to Initialize a new heap
-    if(curproc->p_brk==curproc->p_start_brk){
-        size_t start_pn=ADDR_TO_PN(PAGE_ALIGN_UP(curproc->p_start_brk));
-        size_t end_pn=ADDR_TO_PN(PAGE_ALIGN_UP(addr));
+    // If addr is not in valid range 
+    if((size_t)addr>USER_MEM_HIGH||addr<curproc->p_start_brk){
+        return -ENOMEM;
+    }
 
-        if(end_pn==start_pn){
-            return -ENOMEM;
-        }else{
-            if(!vmmap_is_range_empty(curproc->p_vmmap,start_pn,end_pn-start_pn)){
-                vmmap_remove(curproc->p_vmmap,start_pn,end_pn-start_pn);
-            }
-            
-            // If we cannot find a vmarea, we need to create it
-            vmarea_t *new_vm=vmmap_lookup(curproc->p_vmmap,start_pn);
-            if(new_vm==NULL){
-                // Create a new vmarea
-                long tmp=vmmap_map(curproc->p_vmmap,NULL,start_pn,end_pn-start_pn,PROT_READ|PROT_WRITE, 
-                    MAP_PRIVATE|MAP_ANON | MAP_FIXED,0,VMMAP_DIR_HILO,&new_vm);
-
-                if(tmp<0){
-                    return tmp;
-                }
-            }
-        }
+    if(ADDR_TO_PN(PAGE_ALIGN_UP(curproc->p_brk))==ADDR_TO_PN(PAGE_ALIGN_UP(addr))){
+        // We don't need to do anything here
         curproc->p_brk=addr;
-    } else if(addr<curproc->p_brk){
-        // The heap this to shrink
-        size_t new_end=ADDR_TO_PN(PAGE_ALIGN_UP(addr)); // Get the start page number
-        size_t old_end=ADDR_TO_PN(PAGE_ALIGN_UP(curproc->p_brk));    // Get the end page number
-
-        // The page number may be the same
-        if(new_end!=old_end){
-            vmmap_remove(curproc->p_vmmap,new_end,old_end-new_end);    // Clean up the specified range
-        }
+    }else if(ADDR_TO_PN(PAGE_ALIGN_UP(curproc->p_brk))>ADDR_TO_PN(PAGE_ALIGN_UP(addr))){
+        size_t lopage=ADDR_TO_PN(PAGE_ALIGN_UP(curproc->p_brk));
+        size_t npages=ADDR_TO_PN(PAGE_ALIGN_UP(curproc->p_brk))-ADDR_TO_PN(PAGE_ALIGN_UP(addr));
+        vmmap_remove(curproc->p_vmmap,lopage,npages);    // Clean up the specified range
         curproc->p_brk=addr; // Update the new end of the heap
-    } else if(addr>curproc->p_brk){
-        size_t old_end=ADDR_TO_PN(PAGE_ALIGN_UP(curproc->p_brk));
-        size_t new_end=ADDR_TO_PN(PAGE_ALIGN_UP(addr));
-
-        if(old_end!=new_end){
-            if(!vmmap_is_range_empty(curproc->p_vmmap,old_end,new_end-old_end)){
+    }else{
+        size_t start_pn=ADDR_TO_PN(PAGE_ALIGN_UP(curproc->p_start_brk));
+        size_t brk_pn=ADDR_TO_PN(PAGE_ALIGN_UP(curproc->p_brk));
+        size_t add_pn=ADDR_TO_PN(PAGE_ALIGN_UP(addr));
+        vmarea_t *new_vm=vmmap_lookup(curproc->p_vmmap,start_pn);
+        // If we don't find it, we need to create a new vmarea
+        if(new_vm==NULL){
+            long tmp=vmmap_map(curproc->p_vmmap,NULL,start_pn,add_pn-start_pn,PROT_READ|PROT_WRITE, 
+                MAP_PRIVATE|MAP_ANON | MAP_FIXED,0,VMMAP_DIR_HILO,&new_vm);
+        
+            if(tmp<0){
+                return tmp;
+            }
+        }else{
+            // We just need to expand the vmarea
+            if(!vmmap_is_range_empty(curproc->p_vmmap,brk_pn,add_pn)){
                 return -ENOMEM;     // Beyond its valid range
             }
-            // vmarea_t *cur_vma=vmmap_lookup(curproc->p_vmmap,);
+            new_vm->vma_end=add_pn; // Expand it
         }
-        
-        curproc->p_brk=addr;      
-        // vmarea_t *cur_vma=vmmap_lookup();
-
+        curproc->p_brk=addr;
     }
     *ret=curproc->p_brk;
-    // TODO: Need to come back
     // NOT_YET_IMPLEMENTED("VM: do_brk");
     return 0;
+    
 }

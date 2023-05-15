@@ -77,7 +77,7 @@ long do_mmap(void *addr, size_t len, int prot, int flags, int fd, off_t off,
             fput(&file);
             return -EACCES;
         }
-        if((prot&PROT_WRITE)&&(flags&MAP_SHARED)&&!(file->f_mode&(FMODE_READ|FMODE_WRITE))){
+        if((prot&PROT_WRITE)&&(flags&MAP_SHARED)&&!(file->f_mode&(FMODE_READ)&&file->f_mode&(FMODE_WRITE))){
             fput(&file);
             return -EACCES;
         }
@@ -100,7 +100,7 @@ long do_mmap(void *addr, size_t len, int prot, int flags, int fd, off_t off,
         }
         return -EINVAL;
     }
-    if(len<=0||off<0){
+    if((ssize_t)len<=0||off<0){
         if(file!=NULL){
             fput(&file);
         }

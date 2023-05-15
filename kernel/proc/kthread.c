@@ -78,7 +78,7 @@ kthread_t *kthread_create(proc_t *proc, kthread_func_t func, long arg1,
         slab_obj_free(kthread_allocator,new_kth);
         return NULL;
     }
-    context_setup(&new_kth->kt_ctx,func,arg1,arg2,new_kth->kt_kstack,DEFAULT_STACK_SIZE,curproc->p_pml4); 
+    context_setup(&new_kth->kt_ctx,func,arg1,arg2,new_kth->kt_kstack,DEFAULT_STACK_SIZE,proc->p_pml4); 
     new_kth->kt_retval=NULL;
     new_kth->kt_errno=0;
     new_kth->kt_proc=proc;

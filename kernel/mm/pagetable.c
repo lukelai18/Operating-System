@@ -240,7 +240,6 @@ long _fill_pml4(pml4_t *pml4, uintptr_t paddr, uintptr_t vaddr, uintptr_t vmax,
 long pt_map(pml4_t *pml4, uintptr_t paddr, uintptr_t vaddr, uint32_t pdflags,
             uint32_t ptflags)
 {
-    dbg(DBG_VM,"Now we enter pt_map\n");
     return pt_map_range(pml4, paddr, vaddr, vaddr + PAGE_SIZE, pdflags,
                         ptflags);
 }
@@ -274,6 +273,7 @@ long pt_map_range(pml4_t *pml4, uintptr_t paddr, uintptr_t vaddr,
             KASSERT(pt_virt_to_phys(page) == page - PHYS_OFFSET);
             KASSERT(*(uintptr_t *)page == 0);
             table->phys[idx] = (page - PHYS_OFFSET) | pdflags;
+
         }
         else
         {
@@ -323,6 +323,7 @@ long pt_map_range(pml4_t *pml4, uintptr_t paddr, uintptr_t vaddr,
                 pd->phys[i] =
                     table->phys[idx] +
                     i * PAGE_SIZE_2MB; // keeps all flags, including PT_SIZE
+                
             }
             table->phys[idx] =
                 ((uintptr_t)pd - PHYS_OFFSET) |
@@ -392,8 +393,8 @@ long pt_map_range(pml4_t *pml4, uintptr_t paddr, uintptr_t vaddr,
 
         paddr += PAGE_SIZE;
         vaddr += PAGE_SIZE;
-    }
-
+    } 
+    
     return 0;
 }
 

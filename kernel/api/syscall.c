@@ -172,14 +172,19 @@ static long sys_getdents(getdents_args_t *args)
     ssize_t total_read_bytes=0;
 
     // TODO: Not sure copy_to_user
+    size_t total_entries = 0; 
     while(count_size){
         ssize_t read_bytes=do_getdent(kernel_args.fd,&dirp);
         ERROR_OUT_RET(read_bytes);
+        if (read_bytes == 0) {
+            return total_read_bytes; 
+        }
 
-        long ret2=copy_to_user((kernel_args.dirp+total_read_bytes),&dirp,read_bytes);
+        long ret2=copy_to_user(kernel_args.dirp+total_entries,&dirp,sizeof(dirent_t));
         ERROR_OUT_RET(ret2);
 
         total_read_bytes+=read_bytes;
+        total_entries++;
         count_size--;
     }
     // NOT_YET_IMPLEMENTED("VM: sys_getdents");

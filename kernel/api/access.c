@@ -148,9 +148,6 @@ long addr_perm(proc_t *p, const void *vaddr, int perm)
  */
 long range_perm(proc_t *p, const void *vaddr, size_t len, int perm)
 {
-    if(len==0){
-        return 0;
-    }
     // size_t cur_vaddr=(size_t)vaddr;
     // size_t end_vaddr=(size_t)vaddr+len;
 

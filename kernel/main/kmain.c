@@ -181,9 +181,9 @@ static void *initproc_run(long arg1, void *arg2)
 //     }
 // #endif
 // vmtest_main(1, NULL);
-char *argv[2] = {"segfault", NULL}; 
+char *argv[2] = {NULL, NULL}; 
 char *envp[1] = {NULL}; 
-kernel_execve("/usr/bin/segfault", argv, envp);
+kernel_execve("/sbin/init", argv, envp);
 int status;
 /* Run kshell commands until each kshell process exits */
 while (do_waitpid(-1, &status, 0) != -ECHILD)
