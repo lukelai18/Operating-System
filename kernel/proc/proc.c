@@ -264,8 +264,7 @@ void proc_cleanup(long status)
         vmmap_destroy(&curproc->p_vmmap);
     }
 
-    if(curproc->p_pid==PID_INIT){  // If the current process is initial process
-       
+    if(curproc->p_pid==PID_INIT){  // If the current process is initial process       
        initproc_finish(); // Shup down the weenix
     }
     else{
@@ -276,10 +275,6 @@ void proc_cleanup(long status)
                                                                                  // initial process's list                                                                                  
         }
     }
-
-
-   
-   
     // NOT_YET_IMPLEMENTED("PROCS: proc_cleanup");
 }
 
@@ -316,7 +311,7 @@ void proc_thread_exiting(void *retval)
 void proc_kill(proc_t *proc, long status)
 {
     if(proc!=curproc) { // Make sure that it is not current process
-    proc->p_status=status; // Set the status of the process
+      proc->p_status=status; // Set the status of the process
       list_iterate(&proc->p_threads,p_thr,kthread_t,kt_plink){ // Iterate the process's thread list
             kthread_cancel(p_thr,(void *)status); // Cancel all the thread
       }            // TODO: Not sure if kthread_cancel is correct
@@ -341,7 +336,7 @@ void proc_kill_all()
            }
     }
     do_exit(-1); // Kill the current process
-    //NOT_YET_IMPLEMENTED("PROCS: proc_kill_all");
+    // NOT_YET_IMPLEMENTED("PROCS: proc_kill_all");
 }
 
 /*
@@ -430,7 +425,7 @@ pid_t do_waitpid(pid_t pid, int *status, int options)
     while(1){
        list_iterate(&curproc->p_children,iter_chil,proc_t,p_child_link){    
            if(iter_chil->p_pid==pid){ // Clean up certain process with certain pid   
-            find_pid=iter_chil->p_pid; // Get the pid of the children 
+                find_pid=iter_chil->p_pid; // Get the pid of the children 
            if(iter_chil->p_state==PROC_DEAD){
                *status= iter_chil->p_status;   // Set the status before destroy
                list_remove(&iter_chil->p_child_link); // Remove it from parents children link, since we 
@@ -446,7 +441,7 @@ pid_t do_waitpid(pid_t pid, int *status, int options)
             if(find_pid==-1){ // If we didn't find a specified pid in the children list
                return -ECHILD;
            }
-    }
+        }
         // TODO: Figure out how to return error condition
     }
     else if(pid==-1){

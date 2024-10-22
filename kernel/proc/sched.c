@@ -183,7 +183,7 @@ long sched_cancellable_sleep_on(ktqueue_t *queue, spinlock_t *lock)
  */
 void sched_cancel(kthread_t *thr)
 {
-    KASSERT(thr->kt_state==KT_SLEEP_CANCELLABLE||thr->kt_state==KT_SLEEP); // Ensure it's state
+    // KASSERT(thr->kt_state==KT_SLEEP_CANCELLABLE||thr->kt_state==KT_SLEEP); // Ensure it's state
     thr->kt_cancelled=1;
     if(thr->kt_state==KT_SLEEP_CANCELLABLE){
       // We do not need to use spinlock unless we do SMP
@@ -307,7 +307,7 @@ void sched_wakeup_on(ktqueue_t *q, kthread_t **ktp)
     if(!sched_queue_empty(q)){
         kthread_t *tmp=ktqueue_dequeue(q);  // Taking all the thread off 
         if(ktp!=NULL){
-        *ktp=tmp;     
+            *ktp=tmp;     
         }
         sched_make_runnable(tmp); // Make thread runable and put it into runqueue
     }

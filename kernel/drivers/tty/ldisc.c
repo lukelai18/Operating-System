@@ -23,7 +23,7 @@ void ldisc_init(ldisc_t *ldisc)
     ldisc->ldisc_full=0; // Not NULL
     sched_queue_init(&ldisc->ldisc_read_queue); // Initialize read queue
     memset(ldisc->ldisc_buffer,'\0',LDISC_BUFFER_SIZE); // Clean the buffer
-    NOT_YET_IMPLEMENTED("DRIVERS: ldisc_init");
+    // NOT_YET_IMPLEMENTED("DRIVERS: ldisc_init");
 }
 
 /**
